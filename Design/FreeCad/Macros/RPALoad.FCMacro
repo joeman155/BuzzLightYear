@@ -73,7 +73,10 @@ firstline = 0
 
 points = []
 num_points = 0
-linenum = 0;
+linenum = 0
+# x, y list of points separated, so we can utilise numpy gradient
+x_points = []
+y_points = []
 with open(outfile_path, 'w') as f:
     with open(rpa_file_path) as rpa_file:
         content = rpa_file.readlines()
@@ -92,6 +95,8 @@ with open(outfile_path, 'w') as f:
                 cells = line.split()
                 x = cells[0]
                 y = cells[1]
+                x_points.append(float(x))
+                y_points.append(float(y))
                 points.append([x, y])
 
     # print("Added ", num_points, " to file")
@@ -186,8 +191,14 @@ print("Min x: ", min_x)
 print("Max x: ", max_x)
 
 
+# Initialise function to find gradient
+curve_grad = np.gradient(y_points, x_points)
+
+
+
 # Start generating "inner" points of channel
-channel_points = []
+channel_points_inner = []     # Points closest to Combustion chamber
+channel_points_outter = []    # Points furtherest from Combustion chamber
 for i in range(0, num_points-1):
 	x =  float(points[i][0])
 	y =  float(points[i][1])
@@ -216,10 +227,36 @@ for i in range(0, num_points-1):
 		new_x = x
 		new_y = y
 
-	# Add Wall Thickness
-	new_y = new_y + innerwall_thickness
-	channel_points.append(FreeCAD.Vector(float(new_x),float(new_y),float(0))) # append the coordinates
+	# Add Wall Thickness - This is OLD. We want the "perpendicular" thickness to be innerwall_thickness.
+	# We can't achieve this by simply adjusting the y component of the point on the curve.
+	#
+	# new_y = new_y + innerwall_thickness
+	# channel_points_inner.append(FreeCAD.Vector(float(new_x),float(new_y),float(0))) # append the coordinates
 
+	# First we need to find vector that is tangent to the point we are interested in.
+	grad_vector = [1, curve_grad[x]]
+	grad_vector_unit = grad_vector / np.linalg.norm(grad_vector)
+
+	# Then we want to find the vector that is orthogonal to this vector
+    if grad_vector_unit[1] = 0:
+		orthogonal_vector = [0, 1]
+	else:
+		orthogonal_vector = [1, - 1 / grad_vector_unit[1]]
+
+	# Find the new location / point.
+	v = innerwall_thickness * orthogonal_vector
+	new_x = new_x + v[0]
+	new_y = new_y + v[1]
+
+
+	# if i == 0:
+	# 	# Get gradient using next point and current
+	# elif i == num_points - 1:
+	# 	# Get garient using previous point and current
+	# 	a = 1
+	# else:
+	# 	# Get Gradient using previous and next points
+	# 	a = 1
 
 	prev_x = x
 	prev_y = y
