@@ -12,22 +12,12 @@ import PartDesignGui
 import csv
 import re
 import numpy as np
-import scipy as sc
+# import scipy as sc
+from scipy import interpolate
 from PySide import QtGui
 
 
-def minfn(i,j):
-	if (i < j):
-		return i
-	else:
-		return j
 
-
-def maxfn(i,j):
-	if (i < j):
-		return j
-	else:
-		return i
 
 
 
@@ -78,66 +68,97 @@ linenum = 0
 x_points = []
 y_points = []
 with open(outfile_path, 'w') as f:
-    with open(rpa_file_path) as rpa_file:
-        content = rpa_file.readlines()
-        for line in content:
-            if p.match(line):
-                continue
-            else:
-                num_points = num_points + 1
-                linenum = linenum + 1
-                if firstline == 0:
-                    firstline = 1
-                    # print("i    x     y")
-                    f.write("i    x     y" + "\n")
-                # print(linenum, "     ", line.strip())
-                f.write(str(linenum) + "     " + line.strip() + "\n")
-                cells = line.split()
-                x = cells[0]
-                y = cells[1]
-                x_points.append(float(x))
-                y_points.append(float(y))
-                points.append([x, y])
+	with open(rpa_file_path) as rpa_file:
+		content = rpa_file.readlines()
+		for line in content:
+			if p.match(line):
+				continue
+			else:
+				num_points = num_points + 1
+				linenum = linenum + 1
+				if firstline == 0:
+					firstline = 1
+					f.write("i    x     y" + "\n")
+				# print(linenum, "     ", line.strip())
+				f.write(str(linenum) + "     " + line.strip() + "\n")
+				cells = line.split()
+				x = cells[0]
+				y = cells[1]
+				x_points.append(float(x))
+				y_points.append(float(y))
+				points.append([x, y])
 
-    # print("Added ", num_points, " to file")
+	# print("Added ", num_points, " to file")
+	# Initialise function to find gradient
+	curve_grad = np.gradient(y_points, x_points)
 
-    for i in range(1, num_points+1):
-        x = points[-i][0]
-        y = points[-i][1]
-        y = float(y) + thickness
-        linenum = linenum + 1
-        # print(linenum, "     ", x, "     ", y)
-        f.write(str(linenum) + "     " + str(x) + "     " + str(y) + "\n")
+	for i in range(1, num_points+1):
+		x = float(points[-i][0])
+		y = float(points[-i][1])
+
+		
+
+		# Adding thickness to the y-direction is not what we want. The thickness is length of vector tangent to surface.
+        # y = float(y) + thickness
+
+		# While we are at it, we find out what the point is out outter wall of channel
+		# First we need to find vector that is tangent to the point we are interested in.
+		grad_vector = [1, curve_grad[-i]]
+		grad_vector_unit = np.round(grad_vector / np.linalg.norm(grad_vector),3)
+		# print(grad_vector_unit)
+
+		# Then we want to find the vector that is orthogonal to this vector
+		if grad_vector_unit[1] == 0:
+			orthogonal_vector = [0, 1]
+		else:
+			orthogonal_vector = [1, - 1 / grad_vector_unit[1]]
+			orthogonal_vector = np.round(orthogonal_vector / np.linalg.norm(orthogonal_vector), 3)
+
+		# We want the vector always pointing up in the y-direction (there are two vectors that are perpendicular, and this is the one we want)
+		if orthogonal_vector[1] < 0:
+			orthogonal_vector[0] = -1 * orthogonal_vector[0]
+			orthogonal_vector[1] = -1 * orthogonal_vector[1]
 
 
-    #linenum = linenum + 1
-    #x = points[0][0]
-    #y = points[0][1]
-    #f.write(str(linenum) + "     " + str(x) + "     " + str(y) + "\n")
+		# Find the new location / point.
+		# v = innerwall_thickness * orthogonal_vector
+		v = np.multiply(orthogonal_vector, thickness)
+		new_x = x + v[0]
+		new_y = y + v[1]
+
+		linenum = linenum + 1
+		# print(linenum, "     ", x, "     ", y)
+		f.write(str(linenum) + "     " + str(new_x) + "     " + str(new_y) + "\n")
+
+
+	#linenum = linenum + 1
+	#x = points[0][0]
+	#y = points[0][1]
+	#f.write(str(linenum) + "     " + str(x) + "     " + str(y) + "\n")
 
 print("Created output file: ", outfile)
 
 
 # this read the csv to generate the regenerative cooling unit.
 with open(outfile_path) as csv_file:
-    csv_reader = csv.DictReader(csv_file, delimiter=' ', skipinitialspace=True)
-    line_count = 0
-    for row in csv_reader:
-        # for the first row print the headers
-        if line_count == 0:
-            print(f'Keys are: {", ".join(row)}\n')
-            line_count += 1
-        # for other rows extract the information
-        x = row["x"]
-        y = row["y"]
+	csv_reader = csv.DictReader(csv_file, delimiter=' ', skipinitialspace=True)
+	line_count = 0
+	for row in csv_reader:
+		# for the first row print the headers
+		if line_count == 0:
+			print(f'Keys are: {", ".join(row)}\n')
+			line_count += 1
+		# for other rows extract the information
+		x = row["x"]
+		y = row["y"]
 
-        # and create the geometry
-        # print(x, " ", y)
-        wire.append(FreeCAD.Vector(float(x),float(y),float(0))) # append the coordinates
-        line_count += 1
+		# and create the geometry
+		# print(x, " ", y)
+		wire.append(FreeCAD.Vector(float(x),float(y),float(0))) # append the coordinates
+		line_count += 1
 
-    print(f'\nProcessed {line_count} lines.\n')
-    wire_object = Draft.makeWire(wire,closed=True,face=False,support=None)   # create the wire open
+	print(f'\nProcessed {line_count} lines.\n')
+	wire_object = Draft.makeWire(wire,closed=True,face=False,support=None)   # create the wire open
 
 
 doc.recompute()
@@ -179,26 +200,30 @@ channel_points = []  # Holds points for single channel
 
 # Get min and max X points.
 for i in range(0, num_points):
-    if i == 0:
-        min_x = float(points[i][0])
-        max_x = float(min_x)
-    else:
-        min_x = min(min_x, float(points[i][0]))
-        max_x = max(max_x, float(points[i][0]))
+	if i == 0:
+		min_x = float(points[i][0])
+		max_x = float(min_x)
+	else:
+		min_x = min(min_x, float(points[i][0]))
+		max_x = max(max_x, float(points[i][0]))
 
     
 print("Min x: ", min_x)
 print("Max x: ", max_x)
 
 
-# Initialise function to find gradient
-curve_grad = np.gradient(y_points, x_points)
+
 
 
 
 # Start generating "inner" points of channel
-channel_points_inner = []     # Points closest to Combustion chamber
+channel_points = []           # Points closest to Combustion chamber
+
+channel_points_raw = []       # Where we hold the points in raw format, so we can go over this to generate other points.
+channel_points_raw_x = []
+channel_points_raw_y = []
 channel_points_outter = []    # Points furtherest from Combustion chamber
+num_points2 = 0
 for i in range(0, num_points-1):
 	x =  float(points[i][0])
 	y =  float(points[i][1])
@@ -208,17 +233,19 @@ for i in range(0, num_points-1):
 		next_y =  float(points[i+1][1])
 	
 	
+	# Make sure we don't breach top of nozzle with channel
 	if x < min_x + channel_top_reduction:
 		if next_x < min_x + channel_top_reduction:
 			continue
 		else:
 			print("x, next_x = ", x, ", ", next_x)
-			f = sc.interpolate.interp1d([x, next_x], [y, next_y])
+			f = interpolate.interp1d([x, next_x], [y, next_y])
 			new_x = min_x + channel_top_reduction
 			new_y = f(new_x)
+			# Make sure we don't breach bottom of nozzle with channel
 	elif x > max_x - channel_bottom_reduction:
 		if prev_x < max_x - channel_bottom_reduction:
-			f = sc.interpolate.interp1d([prev_x, x], [prev_y, y])
+			f = interpolate.interp1d([prev_x, x], [prev_y, y])
 			new_x = max_x - channel_bottom_reduction
 			new_y = f(new_x)
 		else:
@@ -227,44 +254,105 @@ for i in range(0, num_points-1):
 		new_x = x
 		new_y = y
 
-	# Add Wall Thickness - This is OLD. We want the "perpendicular" thickness to be innerwall_thickness.
-	# We can't achieve this by simply adjusting the y component of the point on the curve.
-	#
-	# new_y = new_y + innerwall_thickness
-	# channel_points_inner.append(FreeCAD.Vector(float(new_x),float(new_y),float(0))) # append the coordinates
 
+
+	# Add this point to the channel Wall
+	# new_y = new_y + innerwall_thickness
+	# channel_points.append(FreeCAD.Vector(float(new_x),float(new_y),float(0))) # append the coordinates
+	# print("INNER Points: ", new_x, ", ", new_y)
+
+
+	
+	# While we are at it, we find out what the point is out outter wall of channel
 	# First we need to find vector that is tangent to the point we are interested in.
-	grad_vector = [1, curve_grad[x]]
-	grad_vector_unit = grad_vector / np.linalg.norm(grad_vector)
+	grad_vector = [1, curve_grad[i]]
+	grad_vector_unit = np.round(grad_vector / np.linalg.norm(grad_vector),3)
+	# print(grad_vector_unit)
 
 	# Then we want to find the vector that is orthogonal to this vector
-    if grad_vector_unit[1] = 0:
+	if grad_vector_unit[1] == 0:
 		orthogonal_vector = [0, 1]
 	else:
 		orthogonal_vector = [1, - 1 / grad_vector_unit[1]]
+		orthogonal_vector = np.round(orthogonal_vector / np.linalg.norm(orthogonal_vector), 3)
+
+	# We want the vector always pointing up in the y-direction (there are two vectors that are perpendicular, and this is the one we want)
+	if orthogonal_vector[1] < 0:
+		orthogonal_vector[0] = -1 * orthogonal_vector[0]
+		orthogonal_vector[1] = -1 * orthogonal_vector[1]
+
 
 	# Find the new location / point.
-	v = innerwall_thickness * orthogonal_vector
+	# v = innerwall_thickness * orthogonal_vector
+	v = np.multiply(orthogonal_vector, innerwall_thickness)
 	new_x = new_x + v[0]
 	new_y = new_y + v[1]
 
 
-	# if i == 0:
-	# 	# Get gradient using next point and current
-	# elif i == num_points - 1:
-	# 	# Get garient using previous point and current
-	# 	a = 1
-	# else:
-	# 	# Get Gradient using previous and next points
-	# 	a = 1
+	# We push data on to these lists to make the step of creating the outer edge of channel a little less complex.
+	channel_points_raw_x.append(float(new_x))
+	channel_points_raw_y.append(float(new_y))
+	channel_points_raw.append([float(new_x),float(new_y)])
+	num_points2  = num_points2  + 1
+	
+	# now add points to List that will be used to do the drawin.g
+	channel_points.append(FreeCAD.Vector(float(new_x),float(new_y),float(0))) # append the coordinates
+	print("INNER Points: ", new_x, ", ", new_y)
+
 
 	prev_x = x
 	prev_y = y
 
 
-	print("Offset X, Y of Channel inside: ", new_x, ", ", new_y)
+print(channel_points_raw_x)
+print(channel_points_raw_y)
 
-channel_object = Draft.makeWire(channel_points,closed=False,face=False,support=None)   # create the wire open
+curve_grad = np.gradient(channel_points_raw_y, channel_points_raw_x)
+
+
+for i in range(1, num_points2 +1):
+	x = float(channel_points_raw[-i][0])
+	y = float(channel_points_raw[-i][1])
+
+	# Calculate channel height at this point along
+	channel_height = channel_height_top
+
+	# Adding thickness to the y-direction is not what we want. The thickness is length of vector tangent to surface.
+	# y = float(y) + thickness
+	# While we are at it, we find out what the point is out outter wall of channel
+	# First we need to find vector that is tangent to the point we are interested in.
+	grad_vector = [1, curve_grad[-i]]
+	grad_vector_unit = np.round(grad_vector / np.linalg.norm(grad_vector),3)
+	# print(grad_vector_unit)
+
+	# Then we want to find the vector that is orthogonal to this vector
+	if grad_vector_unit[1] == 0:
+		orthogonal_vector = [0, 1]
+	else:
+		orthogonal_vector = [1, - 1 / grad_vector_unit[1]]
+		orthogonal_vector = np.round(orthogonal_vector / np.linalg.norm(orthogonal_vector), 3)
+
+	# We want the vector always pointing up in the y-direction (there are two vectors that are perpendicular, and this is the one we want)
+	if orthogonal_vector[1] < 0:
+		orthogonal_vector[0] = -1 * orthogonal_vector[0]
+		orthogonal_vector[1] = -1 * orthogonal_vector[1]
+
+
+	# Find the new location / point.
+	# v = innerwall_thickness * orthogonal_vector
+	v = np.multiply(orthogonal_vector, channel_height)
+	new_x = x + v[0]
+	new_y = y + v[1]
+
+	linenum = linenum + 1
+	# print(linenum, "     ", x, "     ", y)
+	# f.write(str(linenum) + "     " + str(new_x) + "     " + str(new_y) + "\n")
+	channel_points.append(FreeCAD.Vector(float(new_x),float(new_y),float(0))) # append the coordinates
+
+
+
+
+channel_object = Draft.makeWire(channel_points,closed=True,face=False,support=None)   # create the wire open
 doc.recompute()
 
 sketch_channel = Draft.make_sketch([channel_object], autoconstraints=True, delete=False, radiusPrecision=0)
