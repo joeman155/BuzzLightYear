@@ -1,0 +1,240 @@
+# -*- coding: utf-8 -*-
+#
+# Name: RPALoad.FCMacro
+# Purpose: Given a RPA txt contour file and some additional values, generate the freecad file for the nozzle.
+#
+
+# Macro Begin: C:\Users\joema\OneDrive\Desktop\freecad\RPALoad.FCMacro +++++++++++++++++++++++++++++++++++++++++++++++++
+import FreeCAD
+import PartDesign
+import Draft
+import PartDesignGui
+import csv
+import re
+import numpy as np
+import scipy as sc
+from PySide import QtGui
+
+
+def minfn(i,j):
+	if (i < j):
+		return i
+	else:
+		return j
+
+
+def maxfn(i,j):
+	if (i < j):
+		return j
+	else:
+		return i
+
+
+
+# Parameters
+thickness = 10  # Thickness of the shell, i.e. we displace the profile "thickness" mm in the Y direction.
+outfile = "out_profile.txt"
+
+
+
+# Overall dimensions of regenerative cooling
+innerwall_thickness = 3          # Thickness of material between chamber wall and the channel (y-dirction)
+
+# Channel dimensions
+channel_bottom_reduction = 10    # How far back do we want to bring the channel section in mm
+channel_top_reduction  = 10      # How far forward do we want to bring the channel section in mm
+channel_num_channels  = 10       # Number of channels
+channel_width_top     = 3
+channel_width_throat  = 2
+channel_width_exit    = 3
+channel_height_top    = 2
+channel_height_throat = 2
+channel_height_exit   = 2
+
+
+
+# Variables
+wire = []
+
+
+doc = App.newDocument()
+
+file_dialog = QtGui.QFileDialog()
+rpa_file_path = file_dialog.getOpenFileName()[0]
+print("\nImporting: " + rpa_file_path + "\n")
+
+
+folder = os.path.dirname(rpa_file_path)
+outfile_path = folder + "\\" + outfile
+print("Generating new contour file: ", outfile_path)
+
+p = re.compile('^#')
+firstline = 0
+
+points = []
+num_points = 0
+linenum = 0;
+with open(outfile_path, 'w') as f:
+    with open(rpa_file_path) as rpa_file:
+        content = rpa_file.readlines()
+        for line in content:
+            if p.match(line):
+                continue
+            else:
+                num_points = num_points + 1
+                linenum = linenum + 1
+                if firstline == 0:
+                    firstline = 1
+                    # print("i    x     y")
+                    f.write("i    x     y" + "\n")
+                # print(linenum, "     ", line.strip())
+                f.write(str(linenum) + "     " + line.strip() + "\n")
+                cells = line.split()
+                x = cells[0]
+                y = cells[1]
+                points.append([x, y])
+
+    # print("Added ", num_points, " to file")
+
+    for i in range(1, num_points+1):
+        x = points[-i][0]
+        y = points[-i][1]
+        y = float(y) + thickness
+        linenum = linenum + 1
+        # print(linenum, "     ", x, "     ", y)
+        f.write(str(linenum) + "     " + str(x) + "     " + str(y) + "\n")
+
+
+    #linenum = linenum + 1
+    #x = points[0][0]
+    #y = points[0][1]
+    #f.write(str(linenum) + "     " + str(x) + "     " + str(y) + "\n")
+
+print("Created output file: ", outfile)
+
+
+# this read the csv to generate the regenerative cooling unit.
+with open(outfile_path) as csv_file:
+    csv_reader = csv.DictReader(csv_file, delimiter=' ', skipinitialspace=True)
+    line_count = 0
+    for row in csv_reader:
+        # for the first row print the headers
+        if line_count == 0:
+            print(f'Keys are: {", ".join(row)}\n')
+            line_count += 1
+        # for other rows extract the information
+        x = row["x"]
+        y = row["y"]
+
+        # and create the geometry
+        # print(x, " ", y)
+        wire.append(FreeCAD.Vector(float(x),float(y),float(0))) # append the coordinates
+        line_count += 1
+
+    print(f'\nProcessed {line_count} lines.\n')
+    wire_object = Draft.makeWire(wire,closed=True,face=False,support=None)   # create the wire open
+
+
+doc.recompute()
+
+sketch_nozzle = Draft.make_sketch([wire_object], autoconstraints=True, delete=False, radiusPrecision=0)
+doc.recompute()
+
+doc.addObject('PartDesign::Body','Body')
+doc.Body.Group = [sketch_nozzle]
+doc.recompute()
+
+doc.getObject('Sketch').Support = (doc.getObject('XY_Plane'), [''])
+doc.getObject('Sketch').MapMode = 'FlatFace'
+doc.recompute()
+
+
+
+doc.getObject('Body').newObject('PartDesign::Revolution','Revolution')
+doc.getObject('Revolution').Profile = sketch_nozzle
+doc.getObject('Revolution').ReferenceAxis = (doc.getObject('X_Axis'), [''])
+doc.getObject('Revolution').Angle = 360.0
+doc.getObject('Revolution').Reversed = 1
+doc.getObject('Sketch').Visibility = False
+doc.recompute()
+
+
+
+# this read the csv to generate the channels
+# NOTE, we need to take into account the channel specs...this is to allow us to use the profile to generate 
+# channels that match curvature of the nozzle profile.
+# This takes 3 steps
+# - load data into array  - This was done above and is in list: points
+# - process array of data to conform with design settings
+# - Parse
+
+
+channel_points = []  # Holds points for single channel
+
+
+# Get min and max X points.
+for i in range(0, num_points):
+    if i == 0:
+        min_x = float(points[i][0])
+        max_x = float(min_x)
+    else:
+        min_x = min(min_x, float(points[i][0]))
+        max_x = max(max_x, float(points[i][0]))
+
+    
+print("Min x: ", min_x)
+print("Max x: ", max_x)
+
+
+# Start generating "inner" points of channel
+channel_points = []
+for i in range(0, num_points-1):
+	x =  float(points[i][0])
+	y =  float(points[i][1])
+
+	if i != num_points:
+		next_x =  float(points[i+1][0])
+		next_y =  float(points[i+1][1])
+	
+	
+	if x < min_x + channel_top_reduction:
+		if next_x < min_x + channel_top_reduction:
+			continue
+		else:
+			print("x, next_x = ", x, ", ", next_x)
+			f = sc.interpolate.interp1d([x, next_x], [y, next_y])
+			new_x = min_x + channel_top_reduction
+			new_y = f(new_x)
+	elif x > max_x - channel_bottom_reduction:
+		if prev_x < max_x - channel_bottom_reduction:
+			f = sc.interpolate.interp1d([prev_x, x], [prev_y, y])
+			new_x = max_x - channel_bottom_reduction
+			new_y = f(new_x)
+		else:
+			continue
+	else:
+		new_x = x
+		new_y = y
+
+	# Add Wall Thickness
+	new_y = new_y + innerwall_thickness
+	channel_points.append(FreeCAD.Vector(float(new_x),float(new_y),float(0))) # append the coordinates
+
+
+	prev_x = x
+	prev_y = y
+
+
+	print("Offset X, Y of Channel inside: ", new_x, ", ", new_y)
+
+channel_object = Draft.makeWire(channel_points,closed=False,face=False,support=None)   # create the wire open
+doc.recompute()
+
+sketch_channel = Draft.make_sketch([channel_object], autoconstraints=True, delete=False, radiusPrecision=0)
+doc.recompute()
+
+
+print(f'\nProcessed {line_count} lines.\n')
+
+
+
