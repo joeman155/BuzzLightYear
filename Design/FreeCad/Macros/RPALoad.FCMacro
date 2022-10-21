@@ -818,7 +818,7 @@ doc.recompute()
 
 # Revolve coolant entry torus sketch to finish off coolant entry ring
 doc.addObject('PartDesign::Body','Coolant_outside_entry_torus_body')
-doc.Coolant_entry_torus_body.Group = [sketch_coolant_outside_entry_torus]
+doc.Coolant_outside_entry_torus_body.Group = [sketch_coolant_outside_entry_torus]
 
 sketch_coolant_outside_entry_torus.Support = (doc.getObject('XY_Plane042'), [''])
 sketch_coolant_outside_entry_torus.MapMode = 'FlatFace'
@@ -840,7 +840,7 @@ doc.recompute()
 
 
 # Add to Regen Cooling components
-RegenCoolingChannels.addObjects([doc.getObject('Coolant_outside_entry_torus_body')])
+MotorGroup.addObjects([doc.getObject('Coolant_outside_entry_torus_body')])
 doc.recompute()
 
 
