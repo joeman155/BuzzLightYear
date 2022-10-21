@@ -581,7 +581,8 @@ doc.recompute()
 
 doc.getObject('Coolant_entry_ring_body').newObject('PartDesign::Revolution','Coolant_entry_ring_revolution')
 doc.getObject('Coolant_entry_ring_revolution').Profile = sketch_coolant_entry_ring
-doc.getObject('Coolant_entry_ring_revolution').ReferenceAxis = (doc.getObject('X_Axis040'), [''])
+# doc.getObject('Coolant_entry_ring_revolution').ReferenceAxis = (doc.getObject('X_Axis040'), [''])
+doc.getObject('Coolant_entry_ring_revolution').ReferenceAxis = (doc.getObject('X_Axis'), [''])
 doc.getObject('Coolant_entry_ring_revolution').Angle = 360.000000
 doc.getObject('Coolant_entry_ring_revolution').Midplane = 0
 doc.getObject('Coolant_entry_ring_revolution').Reversed = 0
@@ -647,7 +648,11 @@ for i in range(0, num_points_channel):
 		f = interpolate.interp1d([prev_x, x], [prev_y, y])
 		xx = x_start - coolant_entry_ring_height
 		yy = f(xx)
-		coolant_exit_ring_points.append([xx, yy])
+		coolant_entry_torus_points.append([xx, yy])
+		min_x = min(min_x, xx)
+		max_x = max(max_x, xx)
+		min_y = min(min_y, yy)
+		max_y = max(max_y, yy)
 		break
 	else:
 		xx = x
@@ -713,7 +718,8 @@ doc.recompute()
 
 doc.getObject('Coolant_entry_torus_body').newObject('PartDesign::Revolution','Coolant_entry_torus_revolution')
 doc.getObject('Coolant_entry_torus_revolution').Profile = sketch_coolant_entry_torus
-doc.getObject('Coolant_entry_torus_revolution').ReferenceAxis = (doc.getObject('X_Axis041'), [''])
+# doc.getObject('Coolant_entry_torus_revolution').ReferenceAxis = (doc.getObject('X_Axis041'), [''])
+doc.getObject('Coolant_entry_torus_revolution').ReferenceAxis = (doc.getObject('X_Axis'), [''])
 doc.getObject('Coolant_entry_torus_revolution').Angle = 360.000000
 doc.getObject('Coolant_entry_torus_revolution').Midplane = 0
 doc.getObject('Coolant_entry_torus_revolution').Reversed = 0
@@ -783,6 +789,10 @@ for i in range(0, num_points_channel):
 		xx = x_start - coolant_entry_ring_height
 		yy = f(xx)
 		coolant_outside_entry_torus_points.append([xx, yy])
+		min_x = min(min_x, xx)
+		max_x = max(max_x, xx)
+		min_y = min(min_y, yy)
+		max_y = max(max_y, yy)
 		break
 	else:
 		xx = x
@@ -815,17 +825,17 @@ coolant_outside_entry_torus_points.reverse()
 step_size = 5   # number of degrees
 # for i in range(step_size - gradient_angle, 180 - (step_size - gradient_angle), step_size):
 positions = int(180 / step_size)
-for i in range(0, positions):
+for i in range(0, positions+1):
 	angle = (i * step_size + gradient_angle) * (np.pi / 180)
-	# print("i, Angle: " , i, ", ", angle)
+	# print("iii, Angle: " , i, ", ", angle)
 	xx = middle_x + (coolant_entry_torus_thickness + coolant_entry_ring_height / 2) * math.cos(angle)
 	yy = middle_y + (coolant_entry_torus_thickness + coolant_entry_ring_height / 2) * math.sin(angle)
 	coolant_outside_entry_torus_points.append([xx, yy])
 
 
-# Now that we have Inner and Outer points, we create a sketch.
+# Now that we have all points that make up 1/2 semi-torus, we create a sketch.
 coolant_outside_entry_torus = []
-for i in range(0, len(coolant_entry_torus_points)):
+for i in range(0, len(coolant_outside_entry_torus_points)):
 	x = coolant_outside_entry_torus_points[i][0]
 	y = coolant_outside_entry_torus_points[i][1]
 	coolant_outside_entry_torus.append(FreeCAD.Vector(x,y,float(0))) # append the coordinates
@@ -848,7 +858,8 @@ doc.recompute()
 
 doc.getObject('Coolant_outside_entry_torus_body').newObject('PartDesign::Revolution','Coolant_outside_entry_torus_revolution')
 doc.getObject('Coolant_outside_entry_torus_revolution').Profile = sketch_coolant_outside_entry_torus
-doc.getObject('Coolant_outside_entry_torus_revolution').ReferenceAxis = (doc.getObject('X_Axis042'), [''])
+#doc.getObject('Coolant_outside_entry_torus_revolution').ReferenceAxis = (doc.getObject('X_Axis042'), [''])
+doc.getObject('Coolant_outside_entry_torus_revolution').ReferenceAxis = (doc.getObject('X_Axis'), [''])
 doc.getObject('Coolant_outside_entry_torus_revolution').Angle = 360.000000
 doc.getObject('Coolant_outside_entry_torus_revolution').Midplane = 0
 doc.getObject('Coolant_outside_entry_torus_revolution').Reversed = 0
