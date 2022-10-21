@@ -12,6 +12,7 @@ import PartDesignGui
 import csv
 import re
 import numpy as np
+import math
 # import scipy as sc
 from scipy import interpolate
 from PySide import QtGui
@@ -199,6 +200,9 @@ doc.getObject('Revolution').Reversed = 1
 doc.getObject('Sketch').Visibility = False
 doc.recompute()
 
+
+wire_object.Visibility = False
+doc.recompute()
 
 
 # this read the csv to generate the channels
@@ -403,6 +407,9 @@ doc.recompute()
 
 
 
+channel_object.Visibility = False
+doc.recompute()
+
 
 # Make channel_count copies and rotate these.
 RegenCoolingChannels = App.ActiveDocument.addObject("App::DocumentObjectGroup", "RegenCoolingChannels")
@@ -433,6 +440,7 @@ doc.addObject("Part::Cut","Coolant_exit_ring")
 doc.Coolant_exit_ring.Base = doc.Cylinder_2
 doc.Coolant_exit_ring.Tool = doc.Cylinder_1
 doc.recompute()
+
 
 
 # Next we rotate and move this into place
@@ -545,5 +553,135 @@ doc.recompute()
 sketch_coolant_entry_ring.Visibility = False
 doc.recompute()
 
+coolant_entry_ring_object.Visibility = False
+doc.recompute()
 
 
+# Add to Regen Cooling components
+RegenCoolingChannels.addObjects([doc.getObject('Coolant_entry_ring_body')])
+doc.recompute()
+
+
+
+# Half-Torus - Coolant cooling exit
+doc.addObject("Part::Torus","Coolant_exit_Torus")
+doc.ActiveObject.Label = "Coolant_exit_Torus"
+
+
+doc.getObject('Coolant_exit_Torus').Radius1 = top_radius + channel_height_top
+doc.getObject('Coolant_exit_Torus').Radius2 = coolant_exit_ring_height / 2
+doc.getObject('Coolant_exit_Torus').Angle1 = '-90.00 deg'
+doc.getObject('Coolant_exit_Torus').Angle2 = '90.00 deg'
+
+displacement = channel_top_reduction + coolant_exit_ring_height / 2
+angle_rotation = -90
+doc.getObject('Coolant_exit_Torus').Placement=App.Placement(App.Vector(displacement,0,0), App.Rotation(App.Vector(0,1,0),angle_rotation), App.Vector(0,0,0))
+doc.recompute()
+
+
+# Add to Regen Cooling components
+RegenCoolingChannels.addObjects([doc.getObject('Coolant_exit_Torus')])
+doc.recompute()
+
+
+
+# Entry "torus shaped" object
+# This is the OUTER part of the coolant exit ring. (part 2 of 3)
+coolant_entry_torus_points = []
+for i in range(0, num_points_channel):
+	x = float(channel_outer_points_raw[i][0])
+	y = float(channel_outer_points_raw[i][1])
+	
+	if i == 0:
+		x_start = x
+		min_x = x
+		max_x = x
+		min_y = y
+		max_y = y
+
+	if x_start - x > coolant_entry_ring_height:
+		f = interpolate.interp1d([prev_x, x], [prev_y, y])
+		xx = x_start - coolant_entry_ring_height
+		yy = f(xx)
+		coolant_exit_ring_points.append([xx, yy])
+		break
+	else:
+		xx = x
+		yy = y
+
+	min_x = min(min_x, xx)
+	max_x = max(max_x, xx)
+	min_y = min(min_y, yy)
+	max_y = max(max_y, yy)
+	coolant_entry_torus_points.append([xx, yy])
+	print("added xx, yy: ", xx, ", ", yy)
+
+	prev_x = x
+	prev_y = y
+
+
+# Now we find "mid-point" between (min_x, min_y) and (max_x, max_y)
+f = interpolate.interp1d([min_x, max_x], [min_y, max_y])
+middle_x = (min_x + max_x) / 2
+middle_y = f(middle_x)
+gradient_angle = math.atan((max_y - min_y) / (max_x - min_x)) * 180 / np.pi
+
+print("middle_x, middle_y: ", middle_x, ", ", middle_y)
+print("Angle of strip: ", gradient_angle)
+
+
+coolant_entry_torus_points.reverse()
+
+# Now we create approximation of a circule ( 5 degrees apart ) to make the "torus" like cavity at coolant entry.
+step_size = 5   # number of degrees
+# for i in range(step_size - gradient_angle, 180 - (step_size - gradient_angle), step_size):
+positions = int(180 / step_size)
+for i in range(1, positions - 1):
+	angle = (i * step_size + gradient_angle) * (np.pi / 180)
+	# print("i, Angle: " , i, ", ", angle)
+	xx = middle_x + (coolant_entry_ring_height / 2) * math.cos(angle)
+	yy = middle_y + (coolant_entry_ring_height / 2) * math.sin(angle)
+	coolant_entry_torus_points.append([xx, yy])
+
+
+# Now that we have Inner and Outer points, we create a sketch.
+coolant_entry_torus = []
+for i in range(0, len(coolant_entry_torus_points)):
+	x = coolant_entry_torus_points[i][0]
+	y = coolant_entry_torus_points[i][1]
+	coolant_entry_torus.append(FreeCAD.Vector(x,y,float(0))) # append the coordinates
+
+
+coolant_entry_torus_object = Draft.makeWire(coolant_entry_torus,closed=True,face=False,support=None)   # create the wire open
+doc.recompute()
+
+sketch_coolant_entry_torus = Draft.make_sketch([coolant_entry_torus_object], autoconstraints=True, delete=False, radiusPrecision=0)
+doc.recompute()
+
+
+# Revolve coolant entry torus sketch to finish off coolant entry ring
+doc.addObject('PartDesign::Body','Coolant_entry_torus_body')
+doc.Coolant_entry_torus_body.Group = [sketch_coolant_entry_torus]
+
+sketch_coolant_entry_torus.Support = (doc.getObject('XY_Plane041'), [''])
+sketch_coolant_entry_torus.MapMode = 'FlatFace'
+doc.recompute()
+
+doc.getObject('Coolant_entry_torus_body').newObject('PartDesign::Revolution','Coolant_entry_torus_revolution')
+doc.getObject('Coolant_entry_torus_revolution').Profile = sketch_coolant_entry_torus
+doc.getObject('Coolant_entry_torus_revolution').ReferenceAxis = (doc.getObject('X_Axis041'), [''])
+doc.getObject('Coolant_entry_torus_revolution').Angle = 360.000000
+doc.getObject('Coolant_entry_torus_revolution').Midplane = 0
+doc.getObject('Coolant_entry_torus_revolution').Reversed = 0
+doc.recompute()
+
+sketch_coolant_entry_torus.Visibility = False
+doc.recompute()
+
+coolant_entry_torus_object.Visibility = False
+doc.recompute()
+
+
+# Add to Regen Cooling components
+RegenCoolingChannels.addObjects([doc.getObject('Coolant_entry_torus_body')])
+doc.recompute()
