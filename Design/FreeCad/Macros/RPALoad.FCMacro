@@ -22,24 +22,39 @@ from PySide import QtGui
 
 
 # Parameters
-thickness = 10  # Thickness of the shell, i.e. we displace the profile "thickness" mm in the Y direction.
 outfile = "out_profile.txt"
 
 
 
+
+
+
+
 # Overall dimensions of regenerative cooling
+regen_thickness = 10             # Total thickness of regenerative shell, i.e. we displace the profile "thickness" mm in the Y direction.
 innerwall_thickness = 3          # Thickness of material between chamber wall and the channel (y-dirction)
+
 
 # Channel dimensions
 channel_bottom_reduction = 10    # How far back do we want to bring the channel section in mm
 channel_top_reduction  = 10      # How far forward do we want to bring the channel section in mm
-channel_num_channels  = 10       # Number of channels
+channel_count         = 20       # Number of channels
 channel_width_top     = 3
 channel_width_throat  = 2
 channel_width_exit    = 3
 channel_height_top    = 2
 channel_height_throat = 2
 channel_height_exit   = 2
+
+# Coolant Entry
+coolant_entry_ring_height = 10
+
+
+
+# Coolant Exit
+coolant_exit_ring_height = 10
+
+
 
 
 
@@ -104,7 +119,7 @@ with open(outfile_path, 'w') as f:
 		# While we are at it, we find out what the point is out outter wall of channel
 		# First we need to find vector that is tangent to the point we are interested in.
 		grad_vector = [1, curve_grad[-i]]
-		grad_vector_unit = np.round(grad_vector / np.linalg.norm(grad_vector),3)
+		grad_vector_unit = np.round(grad_vector / np.linalg.norm(grad_vector),8)
 		# print(grad_vector_unit)
 
 		# Then we want to find the vector that is orthogonal to this vector
@@ -112,7 +127,7 @@ with open(outfile_path, 'w') as f:
 			orthogonal_vector = [0, 1]
 		else:
 			orthogonal_vector = [1, - 1 / grad_vector_unit[1]]
-			orthogonal_vector = np.round(orthogonal_vector / np.linalg.norm(orthogonal_vector), 3)
+			orthogonal_vector = np.round(orthogonal_vector / np.linalg.norm(orthogonal_vector), 8)
 
 		# We want the vector always pointing up in the y-direction (there are two vectors that are perpendicular, and this is the one we want)
 		if orthogonal_vector[1] < 0:
@@ -122,7 +137,7 @@ with open(outfile_path, 'w') as f:
 
 		# Find the new location / point.
 		# v = innerwall_thickness * orthogonal_vector
-		v = np.multiply(orthogonal_vector, thickness)
+		v = np.multiply(orthogonal_vector, regen_thickness)
 		new_x = x + v[0]
 		new_y = y + v[1]
 
@@ -223,7 +238,7 @@ channel_points_raw = []       # Where we hold the points in raw format, so we ca
 channel_points_raw_x = []
 channel_points_raw_y = []
 channel_points_outter = []    # Points furtherest from Combustion chamber
-num_points2 = 0
+num_points_channel = 0
 for i in range(0, num_points-1):
 	x =  float(points[i][0])
 	y =  float(points[i][1])
@@ -238,7 +253,6 @@ for i in range(0, num_points-1):
 		if next_x < min_x + channel_top_reduction:
 			continue
 		else:
-			print("x, next_x = ", x, ", ", next_x)
 			f = interpolate.interp1d([x, next_x], [y, next_y])
 			new_x = min_x + channel_top_reduction
 			new_y = f(new_x)
@@ -266,15 +280,14 @@ for i in range(0, num_points-1):
 	# While we are at it, we find out what the point is out outter wall of channel
 	# First we need to find vector that is tangent to the point we are interested in.
 	grad_vector = [1, curve_grad[i]]
-	grad_vector_unit = np.round(grad_vector / np.linalg.norm(grad_vector),3)
-	# print(grad_vector_unit)
+	grad_vector_unit = np.round(grad_vector / np.linalg.norm(grad_vector),8)
 
 	# Then we want to find the vector that is orthogonal to this vector
 	if grad_vector_unit[1] == 0:
 		orthogonal_vector = [0, 1]
 	else:
 		orthogonal_vector = [1, - 1 / grad_vector_unit[1]]
-		orthogonal_vector = np.round(orthogonal_vector / np.linalg.norm(orthogonal_vector), 3)
+		orthogonal_vector = np.round(orthogonal_vector / np.linalg.norm(orthogonal_vector), 8)
 
 	# We want the vector always pointing up in the y-direction (there are two vectors that are perpendicular, and this is the one we want)
 	if orthogonal_vector[1] < 0:
@@ -293,24 +306,21 @@ for i in range(0, num_points-1):
 	channel_points_raw_x.append(float(new_x))
 	channel_points_raw_y.append(float(new_y))
 	channel_points_raw.append([float(new_x),float(new_y)])
-	num_points2  = num_points2  + 1
+	num_points_channel  = num_points_channel  + 1
 	
 	# now add points to List that will be used to do the drawin.g
 	channel_points.append(FreeCAD.Vector(float(new_x),float(new_y),float(0))) # append the coordinates
-	print("INNER Points: ", new_x, ", ", new_y)
 
 
 	prev_x = x
 	prev_y = y
 
 
-print(channel_points_raw_x)
-print(channel_points_raw_y)
 
+# Start generating "outer" points of channel
+channel_outer_points_raw = []
 curve_grad = np.gradient(channel_points_raw_y, channel_points_raw_x)
-
-
-for i in range(1, num_points2 +1):
+for i in range(1, num_points_channel +1):
 	x = float(channel_points_raw[-i][0])
 	y = float(channel_points_raw[-i][1])
 
@@ -322,7 +332,7 @@ for i in range(1, num_points2 +1):
 	# While we are at it, we find out what the point is out outter wall of channel
 	# First we need to find vector that is tangent to the point we are interested in.
 	grad_vector = [1, curve_grad[-i]]
-	grad_vector_unit = np.round(grad_vector / np.linalg.norm(grad_vector),3)
+	grad_vector_unit = np.round(grad_vector / np.linalg.norm(grad_vector),8)
 	# print(grad_vector_unit)
 
 	# Then we want to find the vector that is orthogonal to this vector
@@ -330,7 +340,7 @@ for i in range(1, num_points2 +1):
 		orthogonal_vector = [0, 1]
 	else:
 		orthogonal_vector = [1, - 1 / grad_vector_unit[1]]
-		orthogonal_vector = np.round(orthogonal_vector / np.linalg.norm(orthogonal_vector), 3)
+		orthogonal_vector = np.round(orthogonal_vector / np.linalg.norm(orthogonal_vector), 8)
 
 	# We want the vector always pointing up in the y-direction (there are two vectors that are perpendicular, and this is the one we want)
 	if orthogonal_vector[1] < 0:
@@ -348,6 +358,7 @@ for i in range(1, num_points2 +1):
 	# print(linenum, "     ", x, "     ", y)
 	# f.write(str(linenum) + "     " + str(new_x) + "     " + str(new_y) + "\n")
 	channel_points.append(FreeCAD.Vector(float(new_x),float(new_y),float(0))) # append the coordinates
+	channel_outer_points_raw.append([float(new_x),float(new_y)])
 
 
 
@@ -360,6 +371,179 @@ doc.recompute()
 
 
 print(f'\nProcessed {line_count} lines.\n')
+
+# Calculate angle we must revolve the sketch to ensure we get the channel width desired.
+top_radius = float(y_points[0]) + innerwall_thickness
+circumference = 2 * np.pi * top_radius
+angle_rotation = 360 * channel_width_top / circumference
+
+print("Radius: ", top_radius)
+print("Circumference: ", circumference)
+print("ar: ", angle_rotation)
+
+
+# Create the 3-d representation of the channel
+doc.addObject('PartDesign::Body','BodyChannel')
+doc.BodyChannel.Group = [sketch_channel]
+doc.recompute()
+
+sketch_channel.Support = (doc.getObject('XY_Plane'), [''])
+sketch_channel.MapMode = 'FlatFace'
+doc.recompute()
+
+
+
+doc.getObject('BodyChannel').newObject('PartDesign::Revolution','RevolutionChannel')
+doc.getObject('RevolutionChannel').Profile = sketch_channel
+doc.getObject('RevolutionChannel').ReferenceAxis = (doc.getObject('X_Axis'), [''])
+doc.getObject('RevolutionChannel').Angle = angle_rotation
+doc.getObject('RevolutionChannel').Reversed = 1
+sketch_channel.Visibility = False
+doc.recompute()
+
+
+
+
+# Make channel_count copies and rotate these.
+RegenCoolingChannels = App.ActiveDocument.addObject("App::DocumentObjectGroup", "RegenCoolingChannels")
+RegenCoolingChannels.addObjects([doc.getObject('BodyChannel')])
+for i in range(1,channel_count):
+	channel_copy = doc.copyObject(doc.getObject('BodyChannel'), True)
+	angle = (360 / channel_count) * i
+	channel_copy.Placement=App.Placement(App.Vector(0,0,0), App.Rotation(App.Vector(1,0,0),angle), App.Vector(0,0,0))
+	RegenCoolingChannels.addObjects([channel_copy])
+
+
+
+# Add the coolant exit
+doc.addObject("Part::Cylinder","Cylinder_1")
+doc.ActiveObject.Label = "Cylinder_coolant_exit_build1"
+doc.recompute()
+doc.getObject('Cylinder_1').Radius = top_radius
+doc.getObject('Cylinder_1').Height = coolant_exit_ring_height
+
+
+doc.addObject("Part::Cylinder","Cylinder_2")
+doc.ActiveObject.Label = "Cylinder_coolant_exit_build2"
+doc.recompute()
+doc.getObject('Cylinder_2').Radius = top_radius + channel_height_top
+doc.getObject('Cylinder_2').Height = coolant_exit_ring_height
+
+doc.addObject("Part::Cut","Coolant_exit_ring")
+doc.Coolant_exit_ring.Base = doc.Cylinder_2
+doc.Coolant_exit_ring.Tool = doc.Cylinder_1
+doc.recompute()
+
+
+# Next we rotate and move this into place
+displacement = coolant_exit_ring_height + channel_top_reduction
+angle_rotation = -90
+# doc.Coolant_exit_ring.Placement=App.Placement(App.Vector(0,0,0), App.Rotation(App.Vector(0,1,0),-90), App.Vector(0,0,0))
+doc.Coolant_exit_ring.Placement=App.Placement(App.Vector(displacement,0,0), App.Rotation(App.Vector(0,1,0),angle_rotation), App.Vector(0,0,0))
+
+RegenCoolingChannels.addObjects([doc.getObject('Coolant_exit_ring')])
+
+
+
+
+# Add the coolant entry
+# We use the channel data at exit and work "back". Because the angle of the exit is normally small
+# we use the x-displacement, not the curved length as the height of ring
+#
+# This is the INNER part of the coolant exit ring. (part 1 of 3)
+coolant_exit_ring_points = []
+for i in range(1, num_points_channel +1):
+	x = float(channel_points_raw[-i][0])
+	y = float(channel_points_raw[-i][1])
+	
+	if i == 1:
+		x_start = x
+
+	if x_start - x > coolant_entry_ring_height:
+		f = interpolate.interp1d([prev_x, x], [prev_y, y])
+		xx = x_start - coolant_entry_ring_height
+		yy = f(xx)
+		coolant_exit_ring_points.append([xx, yy])
+		break
+	else:
+		xx = x
+		yy = y
+
+	coolant_exit_ring_points.append([xx, yy])
+	# print("added xx, yy: ", xx, ", ", yy)
+
+
+
+	prev_x = x
+	prev_y = y
+
+
+# Reverse list, so we can continue to add points in
+coolant_exit_ring_points.reverse()
+
+
+
+# This is the OUTER part of the coolant exit ring. (part 2 of 3)
+for i in range(0, num_points_channel):
+	x = float(channel_outer_points_raw[i][0])
+	y = float(channel_outer_points_raw[i][1])
+	
+	if i == 0:
+		x_start = x
+
+	if x_start - x > coolant_entry_ring_height:
+		f = interpolate.interp1d([prev_x, x], [prev_y, y])
+		xx = x_start - coolant_entry_ring_height
+		yy = f(xx)
+		coolant_exit_ring_points.append([xx, yy])
+		break
+	else:
+		xx = x
+		yy = y
+
+	coolant_exit_ring_points.append([xx, yy])
+	# print("added xx, yy: ", xx, ", ", yy)
+
+	prev_x = x
+	prev_y = y
+
+
+# print(coolant_exit_ring_points)
+
+
+# Now that we have Inner and Outer points, we create a sketch.
+coolant_entry_ring = []
+for i in range(1, len(coolant_exit_ring_points)):
+	x = coolant_exit_ring_points[i][0]
+	y = coolant_exit_ring_points[i][1]
+	coolant_entry_ring.append(FreeCAD.Vector(x,y,float(0))) # append the coordinates
+
+
+coolant_entry_ring_object = Draft.makeWire(coolant_entry_ring,closed=True,face=False,support=None)   # create the wire open
+doc.recompute()
+
+sketch_coolant_entry_ring = Draft.make_sketch([coolant_entry_ring_object], autoconstraints=True, delete=False, radiusPrecision=0)
+doc.recompute()
+
+
+# Revolve sketch to finish off coolant entry ring
+doc.addObject('PartDesign::Body','Coolant_entry_ring_body')
+doc.Coolant_entry_ring_body.Group = [sketch_coolant_entry_ring]
+
+sketch_coolant_entry_ring.Support = (doc.getObject('XY_Plane040'), [''])
+sketch_coolant_entry_ring.MapMode = 'FlatFace'
+doc.recompute()
+
+doc.getObject('Coolant_entry_ring_body').newObject('PartDesign::Revolution','Coolant_entry_ring_revolution')
+doc.getObject('Coolant_entry_ring_revolution').Profile = sketch_coolant_entry_ring
+doc.getObject('Coolant_entry_ring_revolution').ReferenceAxis = (doc.getObject('X_Axis040'), [''])
+doc.getObject('Coolant_entry_ring_revolution').Angle = 360.000000
+doc.getObject('Coolant_entry_ring_revolution').Midplane = 0
+doc.getObject('Coolant_entry_ring_revolution').Reversed = 0
+doc.recompute()
+
+sketch_coolant_entry_ring.Visibility = False
+doc.recompute()
 
 
 
