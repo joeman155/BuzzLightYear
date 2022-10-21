@@ -42,10 +42,10 @@ channel_top_reduction  = 10      # How far forward do we want to bring the chann
 channel_count         = 20       # Number of channels
 channel_width_top     = 3
 channel_width_throat  = 2
-channel_width_exit    = 3
+channel_width_bottom  = 3
 channel_height_top    = 2
-channel_height_throat = 2
-channel_height_exit   = 2
+channel_height_throat = 4
+channel_height_bottom = 2
 
 # Coolant Entry
 coolant_entry_ring_height     = 10  # Height if ring, that connects all the channels
@@ -61,7 +61,9 @@ coolant_exit_torus_thickness = 3    # Thickness of torus metal manifold at coola
 
 # Variables
 wire = []
-
+channel_throat_radius = 99999       # This is radius to channel wall, closest to combustion chamber.  # Intentially set too high. Is deduced later.
+channel_top_radius    = 0           # Radius of channel wall at the top of motor
+channel_bottom_radius = 0           # Radius of channel wall at the bottom of motor
 
 doc = App.newDocument()
 
@@ -323,6 +325,7 @@ for i in range(0, num_points-1):
 	channel_points_raw_x.append(float(new_x))
 	channel_points_raw_y.append(float(new_y))
 	channel_points_raw.append([float(new_x),float(new_y)])
+	channel_throat_radius = min(channel_throat_radius, float(new_y))
 	num_points_channel  = num_points_channel  + 1
 	
 	# now add points to List that will be used to do the drawin.g
@@ -332,17 +335,35 @@ for i in range(0, num_points-1):
 	prev_x = x
 	prev_y = y
 
+# Get radius of channel at top and bottom. Required later for calculating the height of channel
+channel_bottom_radius = channel_points_raw_y[0]
+channel_top_radius    = channel_points_raw_y[len(channel_points_raw_y)-1]
 
 
 # Start generating "outer" points of channel
 channel_outer_points_raw = []
 curve_grad = np.gradient(channel_points_raw_y, channel_points_raw_x)
+location   = 2    # 2 is for below throat, near exist   #1 is for above throat
 for i in range(1, num_points_channel +1):
 	x = float(channel_points_raw[-i][0])
 	y = float(channel_points_raw[-i][1])
 
+	# Work out if are moving from the bottom of nozzle to top of nozzle (combustion chamber)
+	if prev_y  < y:
+		location = 1
+
+	if location == 2:
+		r = (y - channel_throat_radius)/(channel_bottom_radius - channel_throat_radius)
+		channel_height = channel_height_bottom * r  +  channel_height_throat * (1 - r)
+	elif location == 1:
+		r = (y - channel_throat_radius)/(channel_top_radius - channel_throat_radius)
+		channel_height = channel_height_top * r  +  channel_height_throat * (1 - r)
+	else:
+		print("ERROR. UNEXPECTED LOCATION: ", location)
+
+
 	# Calculate channel height at this point along
-	channel_height = channel_height_top
+	# channel_height = channel_height_top
 
 	# Adding thickness to the y-direction is not what we want. The thickness is length of vector tangent to surface.
 	# y = float(y) + thickness
@@ -377,7 +398,8 @@ for i in range(1, num_points_channel +1):
 	channel_points.append(FreeCAD.Vector(float(new_x),float(new_y),float(0))) # append the coordinates
 	channel_outer_points_raw.append([float(new_x),float(new_y)])
 
-
+	prev_x = x
+	prev_y = y
 
 
 channel_object = Draft.makeWire(channel_points,closed=True,face=False,support=None)   # create the wire open
