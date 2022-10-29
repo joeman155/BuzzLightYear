@@ -20,16 +20,14 @@ from PySide import QtGui
 
 
 
-
-
 # Parameters
 outfile = "out_profile.txt"
 
 
 
-
-
-
+# --------------------------------------------------------
+# PART SPECIFICATIONS
+# --------------------------------------------------------
 
 # Overall dimensions of regenerative cooling
 regen_thickness = 10             # Total thickness of regenerative shell, i.e. we displace the profile "thickness" mm in the Y direction.
@@ -93,7 +91,7 @@ tvs_eng_mount_p2_circle_distance = 10    # Distance from outer surface of p1 to 
 tvs_eng_mount_p2_thickness       = 3     # thickness of this component
 tvs_eng_mount_p2_gap             = 5     # Gap between two of these parts at BASE (arc length)
 tvs_eng_mount_p2_base_width      = tvs_eng_mount_p1_height # We want it to FIT on P1.
-tvs_eng_mount_p2_base_height     = 20    # Height of the component ...RADIALLY how far above p1
+tvs_eng_mount_p2_base_height     = 10    # Height of the component ...RADIALLY how far above p1
 tvs_eng_mount_p2_sep             = 3     # Separation between the two p2 parts.
 
 
@@ -117,6 +115,7 @@ doc = App.newDocument()
 # Make Groups
 RegenCoolingChannels = App.ActiveDocument.addObject("App::DocumentObjectGroup", "RegenCoolingChannels")
 MotorGroup = App.ActiveDocument.addObject("App::DocumentObjectGroup", "MotorGroup")
+Tvc_Engine_Mount1 = App.ActiveDocument.addObject("App::DocumentObjectGroup", "Tvc_Engine_Mount1")
 
 
 
@@ -1293,16 +1292,48 @@ doc.getObject('tvs_eng_mount_p2_body_copy').Group = [doc.getObject('tvs_eng_moun
 doc.getObject('tvs_eng_mount_p2_body_copy').Tip = doc.getObject('tvs_eng_mount_p2_body_clone')
 doc.recompute()
 
-# doc.getObject('tvs_eng_mount_p2_body_clone').ViewObject.Transparency=getattr(doc.getObject('tvs_eng_mount_p2_body').getLinkedObject(True).ViewObject,'Transparency',App.getDocument('Unnamed3').getObject('Clone').ViewObject.Transparency)
-# doc.getObject('tvs_eng_mount_p2_body_clone').ViewObject.DisplayMode=getattr(doc.getObject('tvs_eng_mount_p2_body').getLinkedObject(True).ViewObject,'DisplayMode',App.getDocument('Unnamed3').getObject('Clone').ViewObject.DisplayMode)
-
-
-
 
 # Move tvs_eng_mount_p2_body_copy over!
 z_displacement = -(tvs_eng_mount_p2_sep + tvs_eng_mount_p2_thickness)
 doc.tvs_eng_mount_p2_body_copy.Placement=App.Placement(App.Vector(0,0,z_displacement), App.Rotation(App.Vector(0,1,0),0), App.Vector(0,0,0))
 doc.recompute()
+
+
+
+# -------------------------------------------
+# Combine P1, 2 x P2 into a Group and union them...
+# -------------------------------------------
+Tvc_Engine_Mount1.addObjects([doc.getObject('tvs_eng_mount_p2_body_copy')])
+Tvc_Engine_Mount1.addObjects([doc.getObject('tvs_eng_mount_p2_body')])
+Tvc_Engine_Mount1.addObjects([doc.getObject('tvs_eng_mount_p1_body')])
+doc.recompute()
+
+doc.addObject("Part::MultiFuse","Tvc_Engine_Mount1_Fusion")
+doc.Tvc_Engine_Mount1_Fusion.Shapes = [doc.tvs_eng_mount_p2_body_copy,doc.tvs_eng_mount_p2_body,doc.tvs_eng_mount_p1_body,]
+doc.Tvc_Engine_Mount1.removeObject(doc.tvs_eng_mount_p2_body_copy)
+doc.Tvc_Engine_Mount1.removeObject(doc.tvs_eng_mount_p2_body)
+doc.Tvc_Engine_Mount1.removeObject(doc.tvs_eng_mount_p1_body)
+doc.Tvc_Engine_Mount1.addObject(doc.Tvc_Engine_Mount1_Fusion)
+doc.recompute()
+
+
+
+
+# --------------------------------------------------
+# Clone new tvs mount point and rotate 90 degrees.
+# --------------------------------------------------
+
+# CLONE tvs_eng_mount_p2_body to tvs_eng_mount_p2_body_copy
+doc.addObject('PartDesign::Body','Tvc_Engine_Mount2_Fusion')
+doc.addObject('PartDesign::FeatureBase','Tvc_Engine_Mount2_Fusion_clone')
+doc.getObject('Tvc_Engine_Mount2_Fusion_clone').BaseFeature = doc.getObject('Tvc_Engine_Mount1_Fusion')
+doc.getObject('Tvc_Engine_Mount2_Fusion_clone').Placement = doc.getObject('Tvc_Engine_Mount1_Fusion').Placement
+doc.getObject('Tvc_Engine_Mount2_Fusion_clone').setEditorMode('Placement',0)
+doc.getObject('Tvc_Engine_Mount2_Fusion').Group = [doc.getObject('Tvc_Engine_Mount2_Fusion_clone')]
+doc.getObject('Tvc_Engine_Mount2_Fusion').Tip = doc.getObject('Tvc_Engine_Mount2_Fusion_clone')
+doc.recompute()
+
+doc.Tvc_Engine_Mount2_Fusion.Placement=App.Placement(App.Vector(0,0,0), App.Rotation(App.Vector(1,0,0),90), App.Vector(0,0,0))
 
 
 
