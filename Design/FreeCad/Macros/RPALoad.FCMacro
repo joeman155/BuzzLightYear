@@ -57,6 +57,45 @@ coolant_exit_ring_height    = 10    # Height if ring, that connects all the chan
 coolant_exit_torus_thickness = 3    # Thickness of torus metal manifold at coolant exit (top of motor)
 
 
+#
+# Basic physical parameters of the component
+# tvs - Thrust Vector System
+# eng - Engine
+# mount - part of the mount system
+# p1    - p for Part  ... #1
+#
+# desc: Component that is attached to the engine body - conduit for TVS force to pivot engine
+#
+tvs_eng_mount_p1_radius    = 0     # Inner Radius - THIS IS SET LATER
+tvs_eng_mount_p1_angle     = 10    # Degrees
+tvs_eng_mount_p1_thickness = 3     # thickness of this component
+tvs_eng_mount_p1_height    = 80    # Height of the component
+
+
+
+
+#
+# Basic physical parameters of the component
+# tvs - Thrust Vector System
+# eng - Engine
+# mount - part of the mount system
+# p2    - p for Part  ... #2
+#
+# desc: Component that TVS rod attaches to, to pivot engine.
+#       We actually have two of these per pivot, several mm apart, but we ony define ONE here.
+#
+tvs_eng_mount_p2_radial_offset   = 0   # How far from axis this component starts - THIS IS SET LATER!
+tvs_eng_mount_p2_radius1         = 20    # outer radius of component
+tvs_eng_mount_p2_radius2         = 5     # inner radius (hole) in the component
+tvs_eng_mount_p2_circle_distance = 10    # Distance from outer surface of p1 to center of circle
+tvs_eng_mount_p2_thickness       = 3     # thickness of this component
+tvs_eng_mount_p2_gap             = 5     # Gap between two of these parts at BASE (arc length)
+tvs_eng_mount_p2_base_width      = tvs_eng_mount_p1_height # We want it to FIT on P1.
+tvs_eng_mount_p2_base_height     = 40    # Height of the component ...RADIALLY how far above p1
+
+
+
+
 
 
 # Variables
@@ -64,6 +103,10 @@ wire = []
 channel_throat_radius = 99999       # This is radius to channel wall, closest to combustion chamber.  # Intentially set too high. Is deduced later.
 channel_top_radius    = 0           # Radius of channel wall at the top of motor
 channel_bottom_radius = 0           # Radius of channel wall at the bottom of motor
+increment_distance = 1              # We approximate curved surfaces by breaking them down into small bits; what se specify here
+overlap = 0.2                       # Because we create arcs as discrete straight lines, they won't 100% touch a surface at some points
+                                    # We 
+
 
 doc = App.newDocument()
 
@@ -413,6 +456,7 @@ print(f'\nProcessed {line_count} lines.\n')
 
 # Calculate angle we must revolve the sketch to ensure we get the channel width desired.
 top_radius = float(y_points[0]) + innerwall_thickness
+combustion_chamber_internal_radius = y_points[0]
 circumference = 2 * np.pi * top_radius
 angle_rotation = 360 * channel_width_top / circumference
 
@@ -663,7 +707,7 @@ for i in range(0, num_points_channel):
 	min_y = min(min_y, yy)
 	max_y = max(max_y, yy)
 	coolant_entry_torus_points.append([xx, yy])
-	print("added xx, yy: ", xx, ", ", yy)
+	# print("added xx, yy: ", xx, ", ", yy)
 
 	prev_x = x
 	prev_y = y
@@ -803,7 +847,7 @@ for i in range(0, num_points_channel):
 	min_y = min(min_y, yy)
 	max_y = max(max_y, yy)
 	coolant_outside_entry_torus_points.append([xx, yy])
-	print("added xx, yy: ", xx, ", ", yy)
+	# print("added xx, yy: ", xx, ", ", yy)
 
 	prev_x = x
 	prev_y = y
@@ -878,3 +922,203 @@ doc.recompute()
 
 
 
+
+
+
+
+# --------------------------------------------------------
+# Create Wire of TVS Engine Mount P1 component
+# This part is created as if looking axially along the rocket engines
+# --------------------------------------------------------
+points = []
+
+tvs_eng_mount_p1_radius = combustion_chamber_internal_radius + regen_thickness - overlap # Outside of combustion chamber, where p1 mates to ending
+
+# Starting point
+x = 0
+y = tvs_eng_mount_p1_radius
+points.append([x, y])
+
+
+
+# Form indie part of the component
+segment_length = 2 * np.pi * tvs_eng_mount_p1_radius * tvs_eng_mount_p1_angle / 360
+segment_count = int(np.floor(segment_length / increment_distance))
+angle = segment_count / (segment_length / increment_distance) * tvs_eng_mount_p1_angle
+for i in range(1,segment_count):
+	theta = (i / segment_count) * angle * (np.pi / 180)
+	x = tvs_eng_mount_p1_radius * np.sin(theta)
+	y = tvs_eng_mount_p1_radius * np.cos(theta)
+	points.append([x, y])
+
+
+# Add the last point on the circular segment
+x = tvs_eng_mount_p1_radius * np.sin(tvs_eng_mount_p1_angle * (np.pi / 180))
+y = tvs_eng_mount_p1_radius * np.cos(tvs_eng_mount_p1_angle * (np.pi / 180))
+points.append([x,y])
+
+
+# Go out by "thickness" amount
+v_orth = [np.sin(tvs_eng_mount_p1_angle * (np.pi / 180)), np.cos(tvs_eng_mount_p1_angle * (np.pi / 180))]
+x = x + tvs_eng_mount_p1_thickness * np.sin(tvs_eng_mount_p1_angle * (np.pi / 180))
+y = y + tvs_eng_mount_p1_thickness * np.cos(tvs_eng_mount_p1_angle * (np.pi / 180))
+points.append([x,y])
+
+
+
+# Now we need to the 'circle" bit back
+x_start = x
+y_start = y
+
+
+r = tvs_eng_mount_p1_radius + tvs_eng_mount_p1_thickness
+segment_length = 2 * np.pi * r * tvs_eng_mount_p1_angle / 360
+segment_count = int(np.floor(segment_length / increment_distance))
+angle = segment_count / (segment_length / increment_distance) * tvs_eng_mount_p1_angle * (np.pi / 180)
+for i in range(1,segment_count):
+	theta = (i / segment_count) * tvs_eng_mount_p1_angle * (np.pi / 180)
+	x = r * np.sin(angle - theta)
+	y = r * np.cos(angle - theta)
+	points.append([x, y])
+
+
+# Add the last point on the circular segment
+phi = 0
+x = r * np.sin(phi * (np.pi / 180))
+y = r * np.cos(phi * (np.pi / 180))
+points.append([x,y])
+
+
+
+# Finishing point
+x = 0
+y = tvs_eng_mount_p1_radius
+points.append([x, y])
+
+
+
+
+# ---------------------------------------------------------------
+# Create the other component, p2 of the TVS  This radially attaches to p1 component.
+# This part is created if looking from side of engine (not radially, not axially)
+# 
+# We only define ONE of these and we pad, rotate, etc later on.
+# ---------------------------------------------------------------
+points2 = []
+
+# We visualise what this will look like
+#
+#           .  . 
+#        .        .  
+#     .      .       .
+#    .      . .        .
+#   .        .          .
+#  .                    .
+# ........................#
+#
+# i.e. straight edges at an angle, arc (part of a circle) top
+# straight edges intersect at tanget with arc
+# Whole shape is symetrical about y axis
+# The is a hole...and this hole is a certain distance from top (i.e. thickness of material)
+#
+
+
+# We need to do a bit geometry stuff before we get points
+# theta = angle which the straight line makes with the horizontal
+# line_radius = length (radius) of the large straight edge makes, where it links to the Arc
+
+# Calcualte angle of sides wrt vertical
+width = tvs_eng_mount_p2_base_width / 2
+t1 = tvs_eng_mount_p2_radius1 / np.sqrt(width ** 2 + tvs_eng_mount_p2_base_height ** 2 - tvs_eng_mount_p2_radius1 **2 )
+t2 = - width / tvs_eng_mount_p2_base_height
+theta = math.atan(t1) - math.atan(t2)
+
+
+# Calculate length of side
+print("width: ", width)
+print("tvs_eng_mount_p2_radius1: ", tvs_eng_mount_p2_radius1)
+print("math.sin(theta): ", np.sin(theta))
+print("math.cos(theta): ", np.cos(theta))
+
+bigR = (width - tvs_eng_mount_p2_radius1 * np.sin(theta)) / np.cos(theta)
+
+print("Theta, bigR : ", theta, bigR)
+
+
+# Set the starting distance from the central axis of engine
+tvs_eng_mount_p2_radial_offset = tvs_eng_mount_p1_radius + tvs_eng_mount_p1_thickness - overlap
+
+# Create points
+x = 0
+y = 0 + tvs_eng_mount_p2_radial_offset
+points2.append([x,y])
+
+
+# Next point is some distance axially, the full width of the component.
+x = x - tvs_eng_mount_p2_base_width
+y = y + 00000000
+points2.append([x,y])
+
+
+# Next point is the straight edge, radially away and further axially to the center of the object
+x = x + bigR * np.cos(theta)
+y = y + bigR * np.sin(theta)
+points2.append([x,y])
+
+
+
+# Do the "arc"
+r = tvs_eng_mount_p2_radius1
+arc_angle = 2 * theta
+segment_length = r * arc_angle 
+segment_count = int(np.floor(segment_length / increment_distance))
+angle = -segment_count / (segment_length / increment_distance) * arc_angle / 2
+for i in range(1,segment_count):
+	phi = (i / segment_count) * arc_angle
+	x = -width + r * np.sin(angle + phi)
+	y = tvs_eng_mount_p2_radial_offset + tvs_eng_mount_p2_base_height + r * np.cos(angle + phi)
+	points2.append([x, y])
+
+
+# Add the last point on the circular segment
+phi = arc_angle / 2
+x = -width + r * np.sin(phi)
+y = tvs_eng_mount_p2_radial_offset + tvs_eng_mount_p2_base_height + r * np.cos(phi)
+points2.append([x,y])
+
+
+
+# Back down to beginning
+x = 0
+y = tvs_eng_mount_p2_radial_offset
+points2.append([x,y])
+
+
+
+# Now that we have all points that make up these two sketches, we create the freeCad objects
+tvs_eng_mount_p1_points = []
+for i in range(0, len(points)):
+	x = points[i][0]
+	y = points[i][1]
+	tvs_eng_mount_p1_points.append(FreeCAD.Vector(x,y,float(0))) # append the coordinates
+
+
+tvs_eng_mount_p1_object = Draft.makeWire(tvs_eng_mount_p1_points,closed=False,face=False,support=None)   # create the wire open
+doc.recompute()
+
+sketch_tvs_eng_mount_p1 = Draft.make_sketch([tvs_eng_mount_p1_object], autoconstraints=True, delete=False, radiusPrecision=0)
+doc.recompute()
+
+
+tvs_eng_mount_p2_points = []
+for i in range(0, len(points2)):
+	x = points2[i][0]
+	y = points2[i][1]
+	tvs_eng_mount_p2_points.append(FreeCAD.Vector(x,y,float(0))) # append the coordinates
+
+
+tvs_eng_mount_p2_object = Draft.makeWire(tvs_eng_mount_p2_points,closed=False,face=False,support=None)   # create the wire open
+doc.recompute()
+
+sketch_tvs_eng_mount_p2 = Draft.make_sketch([tvs_eng_mount_p2_object], autoconstraints=True, delete=False, radiusPrecision=0)
+doc.recompute()
