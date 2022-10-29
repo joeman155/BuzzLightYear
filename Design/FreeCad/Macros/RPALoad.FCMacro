@@ -67,9 +67,11 @@ coolant_exit_torus_thickness = 3    # Thickness of torus metal manifold at coola
 # desc: Component that is attached to the engine body - conduit for TVS force to pivot engine
 #
 tvs_eng_mount_p1_radius    = 0     # Inner Radius - THIS IS SET LATER
-tvs_eng_mount_p1_angle     = 10    # Degrees
+tvs_eng_mount_p1_angle     = 0     # Degrees - THIS IS SET LATER
+tvs_eng_mount_p1_width     = 10    # mm - THIS IS SET LATER
 tvs_eng_mount_p1_thickness = 3     # thickness of this component
 tvs_eng_mount_p1_height    = 80    # Height of the component
+tvs_eng_mount_p1_clearance = 1     # Clearance on each side of the p2 part.
 
 
 
@@ -92,6 +94,7 @@ tvs_eng_mount_p2_thickness       = 3     # thickness of this component
 tvs_eng_mount_p2_gap             = 5     # Gap between two of these parts at BASE (arc length)
 tvs_eng_mount_p2_base_width      = tvs_eng_mount_p1_height # We want it to FIT on P1.
 tvs_eng_mount_p2_base_height     = 40    # Height of the component ...RADIALLY how far above p1
+tvs_eng_mount_p2_sep             = 3     # Separation between the two p2 parts.
 
 
 
@@ -276,18 +279,29 @@ channel_points = []  # Holds points for single channel
 
 
 # Get min and max X points.
+chamber_length = 0
 for i in range(0, num_points):
+	x = float(points[i][0])
+	y = float(points[i][1])
 	if i == 0:
 		min_x = float(points[i][0])
 		max_x = float(min_x)
+		prev_x = x
+		prev_y = y
+		continue
 	else:
 		min_x = min(min_x, float(points[i][0]))
 		max_x = max(max_x, float(points[i][0]))
 
+	if y != prev_y and chamber_length == 0:
+		chamber_length = prev_x
+
+	prev_x = x
+	prev_y = y
     
 print("Min x: ", min_x)
 print("Max x: ", max_x)
-
+print("chamber_length: ", chamber_length)
 
 
 
@@ -930,9 +944,23 @@ doc.recompute()
 # Create Wire of TVS Engine Mount P1 component
 # This part is created as if looking axially along the rocket engines
 # --------------------------------------------------------
-points = []
+# We visualise what this will look like
+#
+#           .  . 
+#        .  .  .   .  
+#     .   .      .   .
+#      .           .   
+#                      
+#                       
+# ........................#
+#
 
+points = []
 tvs_eng_mount_p1_radius = combustion_chamber_internal_radius + regen_thickness - overlap # Outside of combustion chamber, where p1 mates to ending
+
+# Based on separation of plates, thickness and clearance, work out angle to sweep.
+tvs_eng_mount_p1_width = tvs_eng_mount_p1_thickness * 2 + tvs_eng_mount_p2_gap + tvs_eng_mount_p1_clearance * 2
+tvs_eng_mount_p1_angle = math.acos(-(tvs_eng_mount_p1_width ** 2 - tvs_eng_mount_p1_radius ** 2 - tvs_eng_mount_p1_radius ** 2)/(2 * tvs_eng_mount_p1_radius * tvs_eng_mount_p1_radius)) * 180 / np.pi
 
 # Starting point
 x = 0
@@ -1094,13 +1122,39 @@ y = tvs_eng_mount_p2_radial_offset
 points2.append([x,y])
 
 
+# Generate circlular hole.
+points3 = []
+hole_x = -width
+hole_y = tvs_eng_mount_p2_radial_offset + tvs_eng_mount_p2_base_height
+r = tvs_eng_mount_p2_radius2
+arc_angle = 2 * np.pi
+segment_length = r * arc_angle 
+segment_count = int(np.floor(segment_length / increment_distance))
+for i in range(1,segment_count):
+	phi = (i / segment_count) * arc_angle
+	x = hole_x + r * np.sin(phi)
+	y = hole_y + r * np.cos(phi)
+	points3.append([x, y])
+
+
+
+# Add the last point on the circular segment
+phi = arc_angle
+x = hole_x + r * np.sin(phi)
+y = hole_y + r * np.cos(phi)
+points3.append([x,y])
+
+
+# --------------------------------------------------
+# DRAW COMPONENT - P1
+# --------------------------------------------------
 
 # Now that we have all points that make up these two sketches, we create the freeCad objects
 tvs_eng_mount_p1_points = []
 for i in range(0, len(points)):
 	x = points[i][0]
 	y = points[i][1]
-	tvs_eng_mount_p1_points.append(FreeCAD.Vector(x,y,float(0))) # append the coordinates
+	tvs_eng_mount_p1_points.append(FreeCAD.Vector(float(0),y,x)) # append the coordinates
 
 
 tvs_eng_mount_p1_object = Draft.makeWire(tvs_eng_mount_p1_points,closed=False,face=False,support=None)   # create the wire open
@@ -1110,6 +1164,51 @@ sketch_tvs_eng_mount_p1 = Draft.make_sketch([tvs_eng_mount_p1_object], autoconst
 doc.recompute()
 
 
+# Pad p1 component
+doc.addObject('PartDesign::Body','tvs_eng_mount_p1_body')
+doc.tvs_eng_mount_p1_body.Group = [sketch_tvs_eng_mount_p1]
+
+sketch_tvs_eng_mount_p1.Support = (doc.getObject('XY_Plane043'), [''])
+sketch_tvs_eng_mount_p1.MapMode = 'FlatFace'
+doc.recompute()
+
+doc.getObject('tvs_eng_mount_p1_body').newObject('PartDesign::Pad','tvs_eng_mount_p1_pad')
+doc.getObject('tvs_eng_mount_p1_pad').Profile = sketch_tvs_eng_mount_p1
+doc.getObject('tvs_eng_mount_p1_pad').ReferenceAxis = (sketch_tvs_eng_mount_p1, ['N_Axis'])
+doc.getObject('tvs_eng_mount_p1_pad').Direction = (0, 0, 1)
+doc.getObject('tvs_eng_mount_p1_pad').Midplane = 0
+doc.getObject('tvs_eng_mount_p1_pad').Reversed = 0
+doc.getObject('tvs_eng_mount_p1_pad').Offset = 0
+doc.getObject('tvs_eng_mount_p1_pad').Type = 0
+doc.getObject('tvs_eng_mount_p1_pad').Length = tvs_eng_mount_p1_height
+doc.getObject('tvs_eng_mount_p1_pad').TaperAngle = 0
+doc.getObject('tvs_eng_mount_p1_pad').UseCustomVector = 0
+doc.getObject('tvs_eng_mount_p1_pad').AlongSketchNormal = 1
+doc.getObject('tvs_eng_mount_p1_pad').UpToFace = None
+doc.recompute()
+
+sketch_tvs_eng_mount_p1.Visibility = False
+doc.recompute()
+
+tvs_eng_mount_p1_object.Visibility = False
+doc.recompute()
+
+
+# Move/Rotate p1 into place.
+x_displacement = chamber_length - tvs_eng_mount_p1_height
+doc.tvs_eng_mount_p1_body.Placement=App.Placement(App.Vector(x_displacement,0,0), App.Rotation(App.Vector(0,1,0),90), App.Vector(0,0,0))
+doc.recompute()
+
+rotation_angle = tvs_eng_mount_p1_angle / 2
+doc.tvs_eng_mount_p1_body.Placement=App.Placement(App.Vector(0,0,0), App.Rotation(App.Vector(1,0,0),rotation_angle), App.Vector(0,0,0)).multiply(doc.tvs_eng_mount_p1_body.Placement)
+
+
+
+# --------------------------------------------------
+# DRAW COMPONENT - P2
+# --------------------------------------------------
+
+# Now that we have all points that make up these two sketches, we create the freeCad objects
 tvs_eng_mount_p2_points = []
 for i in range(0, len(points2)):
 	x = points2[i][0]
@@ -1117,8 +1216,85 @@ for i in range(0, len(points2)):
 	tvs_eng_mount_p2_points.append(FreeCAD.Vector(x,y,float(0))) # append the coordinates
 
 
-tvs_eng_mount_p2_object = Draft.makeWire(tvs_eng_mount_p2_points,closed=False,face=False,support=None)   # create the wire open
+tvs_eng_mount_p2_object1 = Draft.makeWire(tvs_eng_mount_p2_points,closed=False,face=False,support=None)   # create the wire open
 doc.recompute()
 
-sketch_tvs_eng_mount_p2 = Draft.make_sketch([tvs_eng_mount_p2_object], autoconstraints=True, delete=False, radiusPrecision=0)
+tvs_eng_mount_p2_points = []
+for i in range(0, len(points3)):
+	x = points3[i][0]
+	y = points3[i][1]
+	tvs_eng_mount_p2_points.append(FreeCAD.Vector(x,y,float(0))) # append the coordinates
+
+
+tvs_eng_mount_p2_object2 = Draft.makeWire(tvs_eng_mount_p2_points,closed=True,face=False,support=None)   # create the wire open
 doc.recompute()
+
+sketch_tvs_eng_mount_p2 = Draft.make_sketch([tvs_eng_mount_p2_object1, tvs_eng_mount_p2_object2], autoconstraints=True, delete=False, radiusPrecision=0)
+doc.recompute()
+
+
+# Pad p2 component
+doc.addObject('PartDesign::Body','tvs_eng_mount_p2_body')
+doc.tvs_eng_mount_p2_body.Group = [sketch_tvs_eng_mount_p2]
+
+sketch_tvs_eng_mount_p2.Support = (doc.getObject('XY_Plane043'), [''])
+sketch_tvs_eng_mount_p2.MapMode = 'FlatFace'
+doc.recompute()
+
+doc.getObject('tvs_eng_mount_p2_body').newObject('PartDesign::Pad','tvs_eng_mount_p2_pad')
+doc.getObject('tvs_eng_mount_p2_pad').Profile = sketch_tvs_eng_mount_p2
+doc.getObject('tvs_eng_mount_p2_pad').ReferenceAxis = (sketch_tvs_eng_mount_p2, ['N_Axis'])
+doc.getObject('tvs_eng_mount_p2_pad').Direction = (0, 0, 1)
+doc.getObject('tvs_eng_mount_p2_pad').Midplane = 0
+doc.getObject('tvs_eng_mount_p2_pad').Reversed = 0
+doc.getObject('tvs_eng_mount_p2_pad').Offset = 0
+doc.getObject('tvs_eng_mount_p2_pad').Type = 0
+doc.getObject('tvs_eng_mount_p2_pad').Length = tvs_eng_mount_p2_thickness
+doc.getObject('tvs_eng_mount_p2_pad').TaperAngle = 0
+doc.getObject('tvs_eng_mount_p2_pad').UseCustomVector = 0
+doc.getObject('tvs_eng_mount_p2_pad').AlongSketchNormal = 1
+doc.getObject('tvs_eng_mount_p2_pad').UpToFace = None
+doc.recompute()
+
+sketch_tvs_eng_mount_p2.Visibility = False
+doc.recompute()
+
+tvs_eng_mount_p2_object1.Visibility = False
+doc.recompute()
+
+tvs_eng_mount_p2_object2.Visibility = False
+doc.recompute()
+
+
+# Move/Rotate p2 into place.
+x_displacement = chamber_length
+doc.tvs_eng_mount_p2_body.Placement=App.Placement(App.Vector(x_displacement,0,0), App.Rotation(App.Vector(0,1,0),0), App.Vector(0,0,0))
+doc.recompute()
+
+z_displacement = tvs_eng_mount_p2_sep / 2
+doc.tvs_eng_mount_p2_body.Placement=App.Placement(App.Vector(0,0,z_displacement), App.Rotation(App.Vector(0,1,0),0), App.Vector(0,0,0)).multiply(doc.tvs_eng_mount_p2_body.Placement)
+doc.recompute()
+
+# CLONE tvs_eng_mount_p2_body to tvs_eng_mount_p2_body_copy
+doc.addObject('PartDesign::Body','tvs_eng_mount_p2_body_copy')
+doc.addObject('PartDesign::FeatureBase','tvs_eng_mount_p2_body_clone')
+doc.getObject('tvs_eng_mount_p2_body_clone').BaseFeature = doc.getObject('tvs_eng_mount_p2_body')
+doc.getObject('tvs_eng_mount_p2_body_clone').Placement = doc.getObject('tvs_eng_mount_p2_body').Placement
+doc.getObject('tvs_eng_mount_p2_body_clone').setEditorMode('Placement',0)
+doc.getObject('tvs_eng_mount_p2_body_copy').Group = [doc.getObject('tvs_eng_mount_p2_body_clone')]
+doc.getObject('tvs_eng_mount_p2_body_copy').Tip = doc.getObject('tvs_eng_mount_p2_body_clone')
+doc.recompute()
+
+# doc.getObject('tvs_eng_mount_p2_body_clone').ViewObject.Transparency=getattr(doc.getObject('tvs_eng_mount_p2_body').getLinkedObject(True).ViewObject,'Transparency',App.getDocument('Unnamed3').getObject('Clone').ViewObject.Transparency)
+# doc.getObject('tvs_eng_mount_p2_body_clone').ViewObject.DisplayMode=getattr(doc.getObject('tvs_eng_mount_p2_body').getLinkedObject(True).ViewObject,'DisplayMode',App.getDocument('Unnamed3').getObject('Clone').ViewObject.DisplayMode)
+
+
+
+
+# Move tvs_eng_mount_p2_body_copy over!
+z_displacement = -(tvs_eng_mount_p2_sep + tvs_eng_mount_p2_thickness)
+doc.tvs_eng_mount_p2_body_copy.Placement=App.Placement(App.Vector(0,0,z_displacement), App.Rotation(App.Vector(0,1,0),0), App.Vector(0,0,0))
+doc.recompute()
+
+
+
