@@ -68,9 +68,9 @@ coolant_exit_torus_thickness = 3    # Thickness of torus metal manifold at coola
 #
 tvs_eng_mount_p1_radius    = 0     # Inner Radius - THIS IS SET LATER
 tvs_eng_mount_p1_angle     = 0     # Degrees - THIS IS SET LATER
-tvs_eng_mount_p1_width     = 10    # mm - THIS IS SET LATER
+tvs_eng_mount_p1_width     = 10    # mm - nominal arc - one point to other (straight line) distance
 tvs_eng_mount_p1_thickness = 3     # thickness of this component
-tvs_eng_mount_p1_height    = 80    # Height of the component
+tvs_eng_mount_p1_height    = 30    # Height of the component
 tvs_eng_mount_p1_clearance = 1     # Clearance on each side of the p2 part.
 
 
@@ -87,13 +87,13 @@ tvs_eng_mount_p1_clearance = 1     # Clearance on each side of the p2 part.
 #       We actually have two of these per pivot, several mm apart, but we ony define ONE here.
 #
 tvs_eng_mount_p2_radial_offset   = 0   # How far from axis this component starts - THIS IS SET LATER!
-tvs_eng_mount_p2_radius1         = 20    # outer radius of component
+tvs_eng_mount_p2_radius1         = 10    # outer radius of component
 tvs_eng_mount_p2_radius2         = 5     # inner radius (hole) in the component
 tvs_eng_mount_p2_circle_distance = 10    # Distance from outer surface of p1 to center of circle
 tvs_eng_mount_p2_thickness       = 3     # thickness of this component
 tvs_eng_mount_p2_gap             = 5     # Gap between two of these parts at BASE (arc length)
 tvs_eng_mount_p2_base_width      = tvs_eng_mount_p1_height # We want it to FIT on P1.
-tvs_eng_mount_p2_base_height     = 40    # Height of the component ...RADIALLY how far above p1
+tvs_eng_mount_p2_base_height     = 20    # Height of the component ...RADIALLY how far above p1
 tvs_eng_mount_p2_sep             = 3     # Separation between the two p2 parts.
 
 
@@ -1058,12 +1058,14 @@ points2 = []
 # Calcualte angle of sides wrt vertical
 width = tvs_eng_mount_p2_base_width / 2
 t1 = tvs_eng_mount_p2_radius1 / np.sqrt(width ** 2 + tvs_eng_mount_p2_base_height ** 2 - tvs_eng_mount_p2_radius1 **2 )
-t2 = - width / tvs_eng_mount_p2_base_height
+# t2 = - width / tvs_eng_mount_p2_base_height
+t2 = -tvs_eng_mount_p2_base_height / width
 theta = math.atan(t1) - math.atan(t2)
 
 
 # Calculate length of side
 print("width: ", width)
+print("height: ",tvs_eng_mount_p2_base_height) 
 print("tvs_eng_mount_p2_radius1: ", tvs_eng_mount_p2_radius1)
 print("math.sin(theta): ", np.sin(theta))
 print("math.cos(theta): ", np.cos(theta))
@@ -1079,18 +1081,21 @@ tvs_eng_mount_p2_radial_offset = tvs_eng_mount_p1_radius + tvs_eng_mount_p1_thic
 # Create points
 x = 0
 y = 0 + tvs_eng_mount_p2_radial_offset
+print("1xx, yy: ", x, y)
 points2.append([x,y])
 
 
 # Next point is some distance axially, the full width of the component.
 x = x - tvs_eng_mount_p2_base_width
 y = y + 00000000
+print("2xx, yy: ", x, y)
 points2.append([x,y])
 
 
 # Next point is the straight edge, radially away and further axially to the center of the object
 x = x + bigR * np.cos(theta)
 y = y + bigR * np.sin(theta)
+print("3xx, yy: ", x, y)
 points2.append([x,y])
 
 
@@ -1105,6 +1110,7 @@ for i in range(1,segment_count):
 	phi = (i / segment_count) * arc_angle
 	x = -width + r * np.sin(angle + phi)
 	y = tvs_eng_mount_p2_radial_offset + tvs_eng_mount_p2_base_height + r * np.cos(angle + phi)
+	print("4xx, yy: ", x, y)
 	points2.append([x, y])
 
 
@@ -1112,6 +1118,7 @@ for i in range(1,segment_count):
 phi = arc_angle / 2
 x = -width + r * np.sin(phi)
 y = tvs_eng_mount_p2_radial_offset + tvs_eng_mount_p2_base_height + r * np.cos(phi)
+print("5xx, yy: ", x, y)
 points2.append([x,y])
 
 
@@ -1119,6 +1126,7 @@ points2.append([x,y])
 # Back down to beginning
 x = 0
 y = tvs_eng_mount_p2_radial_offset
+print("6xx, yy: ", x, y)
 points2.append([x,y])
 
 
