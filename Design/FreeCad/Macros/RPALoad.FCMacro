@@ -13,7 +13,7 @@ import csv
 import re
 import numpy as np
 import math
-# import scipy as sc
+from BasicShapes import Shapes
 from scipy import interpolate
 from PySide import QtGui
 
@@ -28,6 +28,17 @@ outfile = "out_profile.txt"
 # --------------------------------------------------------
 # PART SPECIFICATIONS
 # --------------------------------------------------------
+# Injector combusion chamber housing
+InjectorCont_height             = 20  # Length of combustion chamber that extends forward to accomodate injector components
+InjectorCont_inner_radius       = 123 # Inside diameter of the injector assembly housing. - THIS IS SET LATER
+InjectorCont_outer_radius       = 123 # Outside diameter of the injector assembly housing. - THIS IS SET LATER
+InjectorCont_flange_width       = 20  # Additional length in radial direction
+InjectorCont_flange_thickness   = 5   # Thickness of flange
+InjectorCont_flange_hole_count  = 10  # Number of bolts to hold engine head plate on to Flange
+InjectorCont_flange_hole_radius = 5   # Radius of holes for bolts.
+
+
+
 
 # Overall dimensions of regenerative cooling
 regen_thickness = 10             # Total thickness of regenerative shell, i.e. we displace the profile "thickness" mm in the Y direction.
@@ -98,7 +109,6 @@ tvs_eng_mount_p2_sep             = 3     # Separation between the two p2 parts.
 
 
 
-
 # Variables
 wire = []
 channel_throat_radius = 99999       # This is radius to channel wall, closest to combustion chamber.  # Intentially set too high. Is deduced later.
@@ -119,7 +129,9 @@ Tvc_Engine_Mount1 = App.ActiveDocument.addObject("App::DocumentObjectGroup", "Tv
 
 
 
-
+# ------------------------------------------------------------------------
+# Prompt user for curve
+# ------------------------------------------------------------------------
 file_dialog = QtGui.QFileDialog()
 rpa_file_path = file_dialog.getOpenFileName()[0]
 print("\nImporting: " + rpa_file_path + "\n")
@@ -202,11 +214,6 @@ with open(outfile_path, 'w') as f:
 		f.write(str(linenum) + "     " + str(new_x) + "     " + str(new_y) + "\n")
 
 
-	#linenum = linenum + 1
-	#x = points[0][0]
-	#y = points[0][1]
-	#f.write(str(linenum) + "     " + str(x) + "     " + str(y) + "\n")
-
 print("Created output file: ", outfile)
 
 
@@ -246,7 +253,6 @@ doc.getObject('Sketch').MapMode = 'FlatFace'
 doc.recompute()
 
 
-
 doc.getObject('MotorBody').newObject('PartDesign::Revolution','Revolution')
 doc.getObject('Revolution').Profile = sketch_nozzle
 doc.getObject('Revolution').ReferenceAxis = (doc.getObject('X_Axis'), [''])
@@ -255,27 +261,18 @@ doc.getObject('Revolution').Reversed = 1
 doc.getObject('Sketch').Visibility = False
 doc.recompute()
 
-
 wire_object.Visibility = False
 doc.recompute()
-
-
 
 MotorGroup.addObjects([doc.getObject('MotorBody')])
 
 
 
-# this read the csv to generate the channels
-# NOTE, we need to take into account the channel specs...this is to allow us to use the profile to generate 
-# channels that match curvature of the nozzle profile.
-# This takes 3 steps
-# - load data into array  - This was done above and is in list: points
-# - process array of data to conform with design settings
-# - Parse
 
 
-channel_points = []  # Holds points for single channel
-
+# -----------------------------------------------------------------
+# Calculate quantities for use later on
+# -----------------------------------------------------------------
 
 # Get min and max X points.
 chamber_length = 0
@@ -301,6 +298,116 @@ for i in range(0, num_points):
 print("Min x: ", min_x)
 print("Max x: ", max_x)
 print("chamber_length: ", chamber_length)
+
+# Calculate angle we must revolve the sketch to ensure we get the channel width desired.
+top_radius = float(y_points[0]) + innerwall_thickness
+combustion_chamber_internal_radius = y_points[0]
+combustion_chamber_external_radius = combustion_chamber_internal_radius + regen_thickness
+circumference = 2 * np.pi * top_radius
+angle_rotation = 360 * channel_width_top / circumference
+
+print("Radius: ", top_radius)
+print("Circumference: ", circumference)
+print("ar: ", angle_rotation)
+
+
+
+
+
+
+
+# ------------------------------------------------------------------------
+# Create front part of motor - housing for the injectors
+# ------------------------------------------------------------------------
+# Extend the combustion chamber....
+InjectorCont = Shapes.addTube(FreeCAD.ActiveDocument, "InjectorCont")
+InjectorCont.Height      = InjectorCont_height
+InjectorCont.InnerRadius = combustion_chamber_internal_radius
+InjectorCont.OuterRadius = combustion_chamber_external_radius
+InjectorCont.Placement=App.Placement(App.Vector(0,0,0), App.Rotation(App.Vector(0,1,0),-90), App.Vector(0,0,0))
+doc.recompute()
+
+
+# Create flange
+# InjectorCont_flange_hole_count
+# InjectorCont_flange_hole_radius
+InjectorCont_flange = Shapes.addTube(FreeCAD.ActiveDocument, "InjectorCont_flange")
+InjectorCont_flange.Height      = InjectorCont_flange_thickness
+InjectorCont_flange.InnerRadius = combustion_chamber_internal_radius
+InjectorCont_flange.OuterRadius = combustion_chamber_external_radius + InjectorCont_flange_width
+x_displacement = -InjectorCont_height
+InjectorCont_flange.Placement=App.Placement(App.Vector(x_displacement,0,0), App.Rotation(App.Vector(0,1,0),-90), App.Vector(0,0,0))
+doc.recompute()
+
+
+# Group for flange holes
+injectorcont_flange_holes_group = App.ActiveDocument.addObject("App::DocumentObjectGroup", "injectorcont_flange_holes_group")
+
+
+# Create holes for flange
+holes = []
+injectorcont_flange_hole1 = doc.addObject("Part::Cylinder", "injectorcont_flange_hole1")
+injectorcont_flange_hole1.Radius = InjectorCont_flange_hole_radius
+injectorcont_flange_hole1.Height = InjectorCont_flange_thickness
+x_displacement = -InjectorCont_height
+z_displacement = combustion_chamber_external_radius + InjectorCont_flange_width / 2
+injectorcont_flange_hole1.Placement=App.Placement(App.Vector(x_displacement,0,z_displacement), App.Rotation(App.Vector(0,1,0),-90), App.Vector(0,0,0))
+# injectorcont_flange_holes_group.addObjects([doc.getObject('injectorcont_flange_hole1')])
+doc.recompute()
+holes.append(injectorcont_flange_hole1)
+
+
+# Copy these holes InjectorCont_flange_hole_count - 1 times
+rotation_increment = 360 / InjectorCont_flange_hole_count
+for i in range(1,InjectorCont_flange_hole_count):
+	print("Copying hole...")
+	j = i + 1
+	body_name = 'injectorcont_flange_hole' + str(j)
+	clone_name = 'injectorcont_flange_hole1_clone' + str(j)
+	doc.addObject('PartDesign::Body', body_name)
+	doc.addObject('PartDesign::FeatureBase',clone_name)
+	doc.getObject(clone_name).BaseFeature = doc.getObject('injectorcont_flange_hole1')
+	doc.getObject(clone_name).Placement = doc.getObject('injectorcont_flange_hole1').Placement
+	doc.getObject(clone_name).setEditorMode('Placement',0)
+	doc.getObject(body_name).Group = [doc.getObject(clone_name)]
+	doc.getObject(body_name).Tip = doc.getObject(clone_name)
+	x_displacement = -InjectorCont_height
+	z_displacement = combustion_chamber_external_radius + InjectorCont_flange_width / 2
+	x_rotation = i * rotation_increment
+	doc.getObject(body_name).Placement=App.Placement(App.Vector(0,0,0), App.Rotation(App.Vector(1,0,0),x_rotation), App.Vector(0,0,0)).multiply(doc.getObject(body_name).Placement)
+	holes.append(doc.getObject(body_name))
+	doc.recompute()
+
+
+
+
+# -------------------------------------------
+# Combine P1, 2 x P2 into a Group and union them...
+# -------------------------------------------
+doc.addObject("Part::MultiFuse","injectorcont_flange_holes_fusion")
+doc.injectorcont_flange_holes_fusion.Shapes = holes
+doc.injectorcont_flange_holes_group.addObject(doc.injectorcont_flange_holes_fusion)
+doc.recompute()
+
+
+
+exit()
+
+
+
+
+# ------------------------------------------------------------------------
+# this read the csv to generate the channels
+# NOTE, we need to take into account the channel specs...this is to allow us to use the profile to generate 
+# channels that match curvature of the nozzle profile.
+# This takes 3 steps
+# - load data into array  - This was done above and is in list: points
+# - process array of data to conform with design settings
+# - Parse
+# ------------------------------------------------------------------------
+
+channel_points = []  # Holds points for single channel
+
 
 
 
@@ -344,11 +451,6 @@ for i in range(0, num_points-1):
 		new_y = y
 
 
-
-	# Add this point to the channel Wall
-	# new_y = new_y + innerwall_thickness
-	# channel_points.append(FreeCAD.Vector(float(new_x),float(new_y),float(0))) # append the coordinates
-	# print("INNER Points: ", new_x, ", ", new_y)
 
 
 	
@@ -467,15 +569,7 @@ doc.recompute()
 
 print(f'\nProcessed {line_count} lines.\n')
 
-# Calculate angle we must revolve the sketch to ensure we get the channel width desired.
-top_radius = float(y_points[0]) + innerwall_thickness
-combustion_chamber_internal_radius = y_points[0]
-circumference = 2 * np.pi * top_radius
-angle_rotation = 360 * channel_width_top / circumference
 
-print("Radius: ", top_radius)
-print("Circumference: ", circumference)
-print("ar: ", angle_rotation)
 
 
 # Create the 3-d representation of the channel
@@ -547,12 +641,13 @@ RegenCoolingChannels.addObjects([doc.getObject('Coolant_exit_ring')])
 
 
 
-########################################################################
+# ------------------------------------------------------------------------
 # Add the coolant entry ring
 # We use the channel data at exit and work "back". Because the angle of the exit is normally small
 # we use the x-displacement, not the curved length as the height of ring
 #
 # This is the INNER part of the coolant exit ring. (part 1 of 3)
+# ------------------------------------------------------------------------
 coolant_exit_ring_points = []
 for i in range(1, num_points_channel +1):
 	x = float(channel_points_raw[-i][0])
@@ -610,8 +705,6 @@ for i in range(0, num_points_channel):
 	prev_y = y
 
 
-# print(coolant_exit_ring_points)
-
 
 # Now that we have Inner and Outer points, we create a sketch.
 coolant_entry_ring = []
@@ -661,8 +754,9 @@ doc.recompute()
 
 
 
-######################################################################
+# ------------------------------------------------------------------------
 # Half-Torus - Coolant cooling exit
+# ------------------------------------------------------------------------
 doc.addObject("Part::Torus","Coolant_exit_Torus")
 doc.ActiveObject.Label = "Coolant_exit_Torus"
 
@@ -686,9 +780,10 @@ doc.recompute()
 
 
 
-######################################################################
+# ------------------------------------------------------------------------
 # Coolant Entry 1/2 "torus shaped" object
 # This is the 1/2 torus cavity that bounds the coolant entry ring.
+# ------------------------------------------------------------------------
 coolant_entry_torus_points = []
 for i in range(0, num_points_channel):
 	x = float(channel_outer_points_raw[i][0])
@@ -1057,21 +1152,12 @@ points2 = []
 # Calcualte angle of sides wrt vertical
 width = tvs_eng_mount_p2_base_width / 2
 t1 = tvs_eng_mount_p2_radius1 / np.sqrt(width ** 2 + tvs_eng_mount_p2_base_height ** 2 - tvs_eng_mount_p2_radius1 **2 )
-# t2 = - width / tvs_eng_mount_p2_base_height
 t2 = -tvs_eng_mount_p2_base_height / width
 theta = math.atan(t1) - math.atan(t2)
 
 
 # Calculate length of side
-print("width: ", width)
-print("height: ",tvs_eng_mount_p2_base_height) 
-print("tvs_eng_mount_p2_radius1: ", tvs_eng_mount_p2_radius1)
-print("math.sin(theta): ", np.sin(theta))
-print("math.cos(theta): ", np.cos(theta))
-
 bigR = (width - tvs_eng_mount_p2_radius1 * np.sin(theta)) / np.cos(theta)
-
-print("Theta, bigR : ", theta, bigR)
 
 
 # Set the starting distance from the central axis of engine
@@ -1080,21 +1166,18 @@ tvs_eng_mount_p2_radial_offset = tvs_eng_mount_p1_radius + tvs_eng_mount_p1_thic
 # Create points
 x = 0
 y = 0 + tvs_eng_mount_p2_radial_offset
-print("1xx, yy: ", x, y)
 points2.append([x,y])
 
 
 # Next point is some distance axially, the full width of the component.
 x = x - tvs_eng_mount_p2_base_width
 y = y + 00000000
-print("2xx, yy: ", x, y)
 points2.append([x,y])
 
 
 # Next point is the straight edge, radially away and further axially to the center of the object
 x = x + bigR * np.cos(theta)
 y = y + bigR * np.sin(theta)
-print("3xx, yy: ", x, y)
 points2.append([x,y])
 
 
@@ -1109,7 +1192,6 @@ for i in range(1,segment_count):
 	phi = (i / segment_count) * arc_angle
 	x = -width + r * np.sin(angle + phi)
 	y = tvs_eng_mount_p2_radial_offset + tvs_eng_mount_p2_base_height + r * np.cos(angle + phi)
-	print("4xx, yy: ", x, y)
 	points2.append([x, y])
 
 
@@ -1117,7 +1199,6 @@ for i in range(1,segment_count):
 phi = arc_angle / 2
 x = -width + r * np.sin(phi)
 y = tvs_eng_mount_p2_radial_offset + tvs_eng_mount_p2_base_height + r * np.cos(phi)
-print("5xx, yy: ", x, y)
 points2.append([x,y])
 
 
@@ -1125,7 +1206,6 @@ points2.append([x,y])
 # Back down to beginning
 x = 0
 y = tvs_eng_mount_p2_radial_offset
-print("6xx, yy: ", x, y)
 points2.append([x,y])
 
 
