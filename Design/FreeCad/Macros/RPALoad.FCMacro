@@ -80,7 +80,7 @@ tvs_eng_mount_p1_angle     = 0     # Degrees - THIS IS SET LATER
 tvs_eng_mount_p1_width     = 10    # mm - nominal arc - one point to other (straight line) distance
 tvs_eng_mount_p1_thickness = 3     # thickness of this component
 tvs_eng_mount_p1_height    = 30    # Height of the component
-tvs_eng_mount_p1_clearance = 1     # Clearance on each side of the p2 part.
+tvs_eng_mount_p1_clearance = 6     # Clearance on each side of the p2 part.
 
 
 
@@ -1395,16 +1395,8 @@ doc.recompute()
 # -------------------------------------------
 # Combine P1, 2 x P2 into a Group and union them...
 # -------------------------------------------
-# Tvc_Engine_Mounts.addObjects([doc.getObject('tvs_eng_mount_p2_body_copy')])
-# Tvc_Engine_Mounts.addObjects([doc.getObject('tvs_eng_mount_p2_body')])
-# Tvc_Engine_Mount1.addObjects([doc.getObject('tvs_eng_mount_p1_body')])
-# doc.recompute()
-
 doc.addObject("Part::MultiFuse","Tvc_Engine_Mount1_Fusion")
 doc.Tvc_Engine_Mount1_Fusion.Shapes = [doc.tvs_eng_mount_p2_body_copy,doc.tvs_eng_mount_p2_body,doc.tvs_eng_mount_p1_body,]
-# doc.Tvc_Engine_Mount1.removeObject(doc.tvs_eng_mount_p2_body_copy)
-# doc.Tvc_Engine_Mount1.removeObject(doc.tvs_eng_mount_p2_body)
-# doc.Tvc_Engine_Mount1.removeObject(doc.tvs_eng_mount_p1_body)
 doc.Tvc_Engine_Mounts.addObject(doc.Tvc_Engine_Mount1_Fusion)
 doc.recompute()
 
@@ -1414,8 +1406,6 @@ doc.recompute()
 # --------------------------------------------------
 # Clone new tvs mount point and rotate 90 degrees.
 # --------------------------------------------------
-
-# CLONE tvs_eng_mount_p2_body to tvs_eng_mount_p2_body_copy
 doc.addObject('PartDesign::Body','Tvc_Engine_Mount2_Fusion')
 doc.addObject('PartDesign::FeatureBase','Tvc_Engine_Mount2_Fusion_clone')
 doc.getObject('Tvc_Engine_Mount2_Fusion_clone').BaseFeature = doc.getObject('Tvc_Engine_Mount1_Fusion')
@@ -1426,6 +1416,11 @@ doc.getObject('Tvc_Engine_Mount2_Fusion').Tip = doc.getObject('Tvc_Engine_Mount2
 doc.recompute()
 
 doc.Tvc_Engine_Mount2_Fusion.Placement=App.Placement(App.Vector(0,0,0), App.Rotation(App.Vector(1,0,0),90), App.Vector(0,0,0))
+
+
+# --------------------------------------------------
+# Add second Tvs mount to group.
+# --------------------------------------------------
 doc.Tvc_Engine_Mounts.addObject(doc.Tvc_Engine_Mount2_Fusion)
 doc.recompute()
 
