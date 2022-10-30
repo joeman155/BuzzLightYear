@@ -125,7 +125,7 @@ doc = App.newDocument()
 # Make Groups
 RegenCoolingChannels = App.ActiveDocument.addObject("App::DocumentObjectGroup", "RegenCoolingChannels")
 MotorGroup = App.ActiveDocument.addObject("App::DocumentObjectGroup", "MotorGroup")
-Tvc_Engine_Mount1 = App.ActiveDocument.addObject("App::DocumentObjectGroup", "Tvc_Engine_Mount1")
+Tvc_Engine_Mounts = App.ActiveDocument.addObject("App::DocumentObjectGroup", "Tvc_Engine_Mounts")
 
 
 
@@ -391,7 +391,19 @@ doc.recompute()
 
 
 
-exit()
+# ----------------------------------------------
+# Subtract holes from flange
+# ----------------------------------------------
+doc.addObject("Part::Cut","InjectorCont_flange_with_holes")
+doc.InjectorCont_flange_with_holes.Base = doc.InjectorCont_flange
+doc.InjectorCont_flange_with_holes.Tool = doc.injectorcont_flange_holes_fusion
+doc.injectorcont_flange_holes_group.removeObject(doc.injectorcont_flange_holes_fusion)
+doc.injectorcont_flange_holes_group.addObject(doc.InjectorCont_flange_with_holes)
+
+
+
+
+# exit()
 
 
 
@@ -1383,17 +1395,17 @@ doc.recompute()
 # -------------------------------------------
 # Combine P1, 2 x P2 into a Group and union them...
 # -------------------------------------------
-Tvc_Engine_Mount1.addObjects([doc.getObject('tvs_eng_mount_p2_body_copy')])
-Tvc_Engine_Mount1.addObjects([doc.getObject('tvs_eng_mount_p2_body')])
-Tvc_Engine_Mount1.addObjects([doc.getObject('tvs_eng_mount_p1_body')])
-doc.recompute()
+# Tvc_Engine_Mounts.addObjects([doc.getObject('tvs_eng_mount_p2_body_copy')])
+# Tvc_Engine_Mounts.addObjects([doc.getObject('tvs_eng_mount_p2_body')])
+# Tvc_Engine_Mount1.addObjects([doc.getObject('tvs_eng_mount_p1_body')])
+# doc.recompute()
 
 doc.addObject("Part::MultiFuse","Tvc_Engine_Mount1_Fusion")
 doc.Tvc_Engine_Mount1_Fusion.Shapes = [doc.tvs_eng_mount_p2_body_copy,doc.tvs_eng_mount_p2_body,doc.tvs_eng_mount_p1_body,]
-doc.Tvc_Engine_Mount1.removeObject(doc.tvs_eng_mount_p2_body_copy)
-doc.Tvc_Engine_Mount1.removeObject(doc.tvs_eng_mount_p2_body)
-doc.Tvc_Engine_Mount1.removeObject(doc.tvs_eng_mount_p1_body)
-doc.Tvc_Engine_Mount1.addObject(doc.Tvc_Engine_Mount1_Fusion)
+# doc.Tvc_Engine_Mount1.removeObject(doc.tvs_eng_mount_p2_body_copy)
+# doc.Tvc_Engine_Mount1.removeObject(doc.tvs_eng_mount_p2_body)
+# doc.Tvc_Engine_Mount1.removeObject(doc.tvs_eng_mount_p1_body)
+doc.Tvc_Engine_Mounts.addObject(doc.Tvc_Engine_Mount1_Fusion)
 doc.recompute()
 
 
@@ -1414,6 +1426,7 @@ doc.getObject('Tvc_Engine_Mount2_Fusion').Tip = doc.getObject('Tvc_Engine_Mount2
 doc.recompute()
 
 doc.Tvc_Engine_Mount2_Fusion.Placement=App.Placement(App.Vector(0,0,0), App.Rotation(App.Vector(1,0,0),90), App.Vector(0,0,0))
-
+doc.Tvc_Engine_Mounts.addObject(doc.Tvc_Engine_Mount2_Fusion)
+doc.recompute()
 
 
