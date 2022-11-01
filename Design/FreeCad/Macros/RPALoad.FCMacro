@@ -32,12 +32,21 @@ outfile = "out_profile.txt"
 InjectorCont_height             = 20  # Length of combustion chamber that extends forward to accomodate injector components
 InjectorCont_inner_radius       = 123 # Inside diameter of the injector assembly housing. - THIS IS SET LATER
 InjectorCont_outer_radius       = 123 # Outside diameter of the injector assembly housing. - THIS IS SET LATER
-InjectorCont_flange_width       = 20  # Additional length in radial direction
+InjectorCont_flange_width       = 10  # Additional length in radial direction
 InjectorCont_flange_thickness   = 5   # Thickness of flange
-InjectorCont_flange_hole_count  = 10  # Number of bolts to hold engine head plate on to Flange
-InjectorCont_flange_hole_radius = 5   # Radius of holes for bolts.
+InjectorCont_flange_hole_count  = 30  # Number of bolts to hold engine head plate on to Flange
+InjectorCont_flange_hole_radius = 1.5 # Radius of holes for bolts.
+
+InjectorCont_flange_oring_grove_depth = 1   # Depth of oring Grove
+InjectorCont_flange_oring_grove_width = 1   # Width of oring Grove
 
 
+
+
+
+# Endcap - the part that bolts on to the engine flange - where all propellants, etc are delivered
+Endcap_radius = 123              # radius of cap - to suit flange - THIS IS SET LATER
+Endcap_thickness = 5             # Thickness of cap.
 
 
 # Overall dimensions of regenerative cooling
@@ -106,6 +115,20 @@ tvs_eng_mount_p2_base_height     = 10    # Height of the component ...RADIALLY h
 tvs_eng_mount_p2_sep             = 3     # Separation between the two p2 parts.
 
 
+
+# Endcap has some points where we bolt a truss
+# These 
+endcap_mount_p1_radial_offset   = 0     # How far from axis this component starts - THIS IS SET LATER!
+endcap_mount_p1_radius1         = 6     # outer radius of component
+endcap_mount_p1_radius2         = 2     # inner radius (hole) in the component
+endcap_mount_p1_circle_distance = 10    # Distance from outer surface of p1 to center of circle
+endcap_mount_p1_thickness       = 5     # thickness of this component
+endcap_mount_p1_gap             = 5     # Gap between two of these parts at BASE (arc length)
+endcap_mount_p1_base_width      = 15    # nominal width
+endcap_mount_p1_height_straight = 3     # From the base, we initially go up THIS many mm above.
+endcap_mount_p1_base_height     = 3     # Height of the circular part of the component...above the base.
+endcap_mount_p1_base_offset     = 3     # How much to move the hole away from center of radius1 circle - UP.
+endcap_mount_p1_count           = 4     # Number of these mounts
 
 
 
@@ -360,7 +383,6 @@ holes.append(injectorcont_flange_hole1)
 # Copy these holes InjectorCont_flange_hole_count - 1 times
 rotation_increment = 360 / InjectorCont_flange_hole_count
 for i in range(1,InjectorCont_flange_hole_count):
-	print("Copying hole...")
 	j = i + 1
 	body_name = 'injectorcont_flange_hole' + str(j)
 	clone_name = 'injectorcont_flange_hole1_clone' + str(j)
@@ -400,10 +422,34 @@ doc.InjectorCont_flange_with_holes.Tool = doc.injectorcont_flange_holes_fusion
 doc.injectorcont_flange_holes_group.removeObject(doc.injectorcont_flange_holes_fusion)
 doc.injectorcont_flange_holes_group.addObject(doc.InjectorCont_flange_with_holes)
 
+# NOTE: We use want to duplicate doc.InjectorCont_flange_with_holes
 
 
 
-# exit()
+# ----------------------------------------------
+# Create o-Ring groove
+# ----------------------------------------------
+# InjectorCont_flange_oring_grove_depth
+grove_points = [[0,0], [0,InjectorCont_flange_oring_grove_width], [-InjectorCont_flange_oring_grove_depth, InjectorCont_flange_oring_grove_width], [-InjectorCont_flange_oring_grove_depth, 0], [0,0]]
+print(grove_points)
+
+grove_points_wire = []
+for i in range(0,len(grove_points)):
+	x = grove_points[i][0]
+	y = grove_points[i][1]
+	grove_points_wire.append(FreeCAD.Vector(float(x),float(y),float(0))) # append the coordinates
+
+
+grove_wire_object = Draft.makeWire(grove_points_wire,closed=False,face=False,support=None)   # create the wire open
+doc.recompute()
+
+sketch_grove = Draft.make_sketch([grove_wire_object], autoconstraints=True, delete=False, radiusPrecision=0)
+doc.recompute()
+
+
+# ----------------------------------------------
+# Subtract o-Ring from flange
+# ----------------------------------------------
 
 
 
@@ -418,7 +464,7 @@ doc.injectorcont_flange_holes_group.addObject(doc.InjectorCont_flange_with_holes
 # - Parse
 # ------------------------------------------------------------------------
 
-channel_points = []  # Holds points for single channel
+# channel_points = []  # Holds points for single channel
 
 
 
@@ -1065,7 +1111,7 @@ points = []
 tvs_eng_mount_p1_radius = combustion_chamber_internal_radius + regen_thickness - overlap # Outside of combustion chamber, where p1 mates to ending
 
 # Based on separation of plates, thickness and clearance, work out angle to sweep.
-tvs_eng_mount_p1_width = tvs_eng_mount_p1_thickness * 2 + tvs_eng_mount_p2_gap + tvs_eng_mount_p1_clearance * 2
+tvs_eng_mount_p1_width = tvs_eng_mount_p2_thickness * 2 + tvs_eng_mount_p2_gap + tvs_eng_mount_p1_clearance * 2
 tvs_eng_mount_p1_angle = math.acos(-(tvs_eng_mount_p1_width ** 2 - tvs_eng_mount_p1_radius ** 2 - tvs_eng_mount_p1_radius ** 2)/(2 * tvs_eng_mount_p1_radius * tvs_eng_mount_p1_radius)) * 180 / np.pi
 
 # Starting point
@@ -1425,3 +1471,282 @@ doc.Tvc_Engine_Mounts.addObject(doc.Tvc_Engine_Mount2_Fusion)
 doc.recompute()
 
 
+
+
+
+
+# --------------------------------------------------
+# Create beginnings of End Cap for Combusion Chamber and Injector holder.
+# --------------------------------------------------
+# Create the "disc"
+Endcap_radius = combustion_chamber_external_radius + InjectorCont_flange_width
+Endcap_base = doc.addObject("Part::Cylinder", "Endcap_base")
+Endcap_base.Radius = Endcap_radius
+Endcap_base.Height = Endcap_thickness
+x_displacement = -InjectorCont_height - InjectorCont_flange_thickness
+Endcap_base.Placement=App.Placement(App.Vector(x_displacement,0,0), App.Rotation(App.Vector(0,1,0),-90), App.Vector(0,0,0))
+doc.recompute()
+
+
+
+# Copy holes created previously (they need to line up)
+endcap_holes_body_name = 'Endcap_bolt_holes'
+clone_name = 'InjectorCont_flange_holes_clone'
+doc.addObject('PartDesign::Body', endcap_holes_body_name)
+doc.addObject('PartDesign::FeatureBase',clone_name)
+doc.getObject(clone_name).BaseFeature = doc.getObject('injectorcont_flange_holes_fusion')
+doc.getObject(clone_name).Placement = doc.getObject('injectorcont_flange_holes_fusion').Placement
+doc.getObject(clone_name).setEditorMode('Placement',0)
+doc.getObject(endcap_holes_body_name).Group = [doc.getObject(clone_name)]
+doc.getObject(endcap_holes_body_name).Tip = doc.getObject(clone_name)
+x_displacement = - InjectorCont_flange_thickness
+doc.getObject(endcap_holes_body_name).Placement=App.Placement(App.Vector(x_displacement,0,0), App.Rotation(App.Vector(0,1,0),0), App.Vector(0,0,0))
+doc.recompute()
+
+# ----------------------------------------------
+# Subtract holes from End Cap
+# ----------------------------------------------
+doc.addObject("Part::Cut","Endcap_with_holes")
+doc.Endcap_with_holes.Base = Endcap_base
+doc.Endcap_with_holes.Tool = doc.getObject(endcap_holes_body_name)
+doc.recompute()
+
+
+
+# ----------------------------------------------
+# Endcap attachments for truss
+# ----------------------------------------------
+
+# ---------------------------------------------------------------
+# Create the other component, p2 of the TVS  This radially attaches to p1 component.
+# This part is created if looking from side of engine (not radially, not axially)
+# 
+# We only define ONE of these and we pad, rotate, etc later on.
+# ---------------------------------------------------------------
+points2 = []
+
+# We visualise what this will look like
+#
+#           .  . 
+#        .        .  
+#     .      .       .
+#    .      . .        .
+#   .        .          .
+#  .                    .
+#  .                    .
+# ........................#
+#
+# i.e. straight edges at an angle, arc (part of a circle) top
+# straight edges intersect at tanget with arc
+# Whole shape is symetrical about y axis
+# The is a hole...and this hole is a certain distance from top (i.e. thickness of material)
+#
+
+
+# We need to do a bit geometry stuff before we get points
+# theta = angle which the straight line makes with the horizontal
+# line_radius = length (radius) of the large straight edge makes, where it links to the Arc
+
+# Calcualte angle of sides wrt vertical
+width = endcap_mount_p1_base_width / 2
+t1 = endcap_mount_p1_radius1 / np.sqrt(width ** 2 + endcap_mount_p1_base_height ** 2 - endcap_mount_p1_radius1 **2 )
+t2 = -endcap_mount_p1_base_height / width
+theta = math.atan(t1) - math.atan(t2)
+
+
+# Calculate length of side
+bigR = (width - endcap_mount_p1_radius1 * np.sin(theta)) / np.cos(theta)
+
+
+# joe
+# Set the starting distance from the central axis of engine
+endcap_mount_p1_radial_offset = combustion_chamber_external_radius + InjectorCont_flange_width - overlap
+
+# Create points
+x = 0
+y = 0 + endcap_mount_p1_radial_offset
+points2.append([x,y])
+# print("x, y: ", x, y)
+
+
+
+# Next point is some distance axially, the full width of the component.
+x = x - endcap_mount_p1_base_width
+y = y + 00000000
+points2.append([x,y])
+# print("x, y: ", x, y)
+
+
+
+
+# Next Point is straight out (radially)
+x = x - 0000000
+y = y + endcap_mount_p1_height_straight
+points2.append([x,y])
+
+
+# Next point is the straight edge, radially away and further axially to the center of the object
+x = x + bigR * np.cos(theta)
+y = y + bigR * np.sin(theta)
+points2.append([x,y])
+# print("x, y: ", x, y)
+
+
+
+# Do the "arc"
+r = endcap_mount_p1_radius1
+arc_angle = 2 * theta
+segment_length = r * arc_angle 
+segment_count = int(np.floor(segment_length / increment_distance))
+angle = -segment_count / (segment_length / increment_distance) * arc_angle / 2
+for i in range(1,segment_count):
+	phi = (i / segment_count) * arc_angle
+	x = -width + r * np.sin(angle + phi)
+	y = endcap_mount_p1_radial_offset + endcap_mount_p1_base_height + endcap_mount_p1_height_straight + r * np.cos(angle + phi)
+	points2.append([x, y])
+	print("x, y: ", x, y)
+
+
+# Add the last point on the circular segment
+phi = arc_angle / 2
+x = -width + r * np.sin(phi)
+y = endcap_mount_p1_radial_offset + endcap_mount_p1_base_height + endcap_mount_p1_height_straight +  r * np.cos(phi)
+points2.append([x,y])
+print("x, y: ", x, y)
+
+
+
+# Back down to beginning -1
+x = 0
+y = endcap_mount_p1_radial_offset + endcap_mount_p1_height_straight
+points2.append([x,y])
+print("x, y: ", x, y)
+
+
+
+# Back down to beginning
+x = 0
+y = endcap_mount_p1_radial_offset
+points2.append([x,y])
+print("x, y: ", x, y)
+
+
+# Generate circlular hole.
+points3 = []
+hole_x = -width
+hole_y = endcap_mount_p1_radial_offset + endcap_mount_p1_base_height + endcap_mount_p1_base_offset + endcap_mount_p1_height_straight
+r = endcap_mount_p1_radius2
+arc_angle = 2 * np.pi
+segment_length = r * arc_angle 
+segment_count = int(np.floor(segment_length / increment_distance))
+for i in range(1,segment_count):
+	phi = (i / segment_count) * arc_angle
+	x = hole_x + r * np.sin(phi)
+	y = hole_y + r * np.cos(phi)
+	points3.append([x, y])
+	
+
+
+
+# Add the last point on the circular segment
+phi = arc_angle
+x = hole_x + r * np.sin(phi)
+y = hole_y + r * np.cos(phi)
+points3.append([x,y])
+
+
+
+
+# Now that we have all points that make up these two sketches, we create the freeCad objects
+endcap_mount_p1_points = []
+for i in range(0, len(points2)):
+	x = points2[i][0]
+	y = points2[i][1]
+	endcap_mount_p1_points.append(FreeCAD.Vector(x,y,float(0))) # append the coordinates
+
+
+endcap_mount_p1_object1 = Draft.makeWire(endcap_mount_p1_points,closed=False,face=False,support=None)   # create the wire open
+doc.recompute()
+
+endcap_mount_p1_points = []
+for i in range(0, len(points3)):
+	x = points3[i][0]
+	y = points3[i][1]
+	endcap_mount_p1_points.append(FreeCAD.Vector(x,y,float(0))) # append the coordinates
+
+
+endcap_mount_p1_object2 = Draft.makeWire(endcap_mount_p1_points,closed=True,face=False,support=None)   # create the wire open
+doc.recompute()
+
+sketch_endcap_mount_p1 = Draft.make_sketch([endcap_mount_p1_object1, endcap_mount_p1_object2], autoconstraints=True, delete=False, radiusPrecision=0)
+doc.recompute()
+
+
+
+## ----------------------------------------------
+# Endcap attachments for truss - Create Pads, move into position and copy/rotate
+# ----------------------------------------------
+doc.addObject('PartDesign::Body','endcap_mount_p1_body')
+doc.endcap_mount_p1_body.Group = [sketch_endcap_mount_p1]
+
+sketch_endcap_mount_p1.Support = (doc.getObject('XY_Plane043'), [''])
+sketch_endcap_mount_p1.MapMode = 'FlatFace'
+doc.recompute()
+
+doc.getObject('endcap_mount_p1_body').newObject('PartDesign::Pad','endcap_mount_p1_pad')
+doc.getObject('endcap_mount_p1_pad').Profile = sketch_endcap_mount_p1
+doc.getObject('endcap_mount_p1_pad').ReferenceAxis = (sketch_endcap_mount_p1, ['N_Axis'])
+doc.getObject('endcap_mount_p1_pad').Direction = (0, 0, 1)
+doc.getObject('endcap_mount_p1_pad').Midplane = 0
+doc.getObject('endcap_mount_p1_pad').Reversed = 0
+doc.getObject('endcap_mount_p1_pad').Offset = 0
+doc.getObject('endcap_mount_p1_pad').Type = 0
+doc.getObject('endcap_mount_p1_pad').Length = endcap_mount_p1_thickness
+doc.getObject('endcap_mount_p1_pad').TaperAngle = 0
+doc.getObject('endcap_mount_p1_pad').UseCustomVector = 0
+doc.getObject('endcap_mount_p1_pad').AlongSketchNormal = 1
+doc.getObject('endcap_mount_p1_pad').UpToFace = None
+doc.recompute()
+
+sketch_endcap_mount_p1.Visibility = False
+doc.recompute()
+
+endcap_mount_p1_object1.Visibility = False
+doc.recompute()
+
+endcap_mount_p1_object2.Visibility = False
+doc.recompute()
+
+
+# Move/Rotate p1 into place.
+doc.endcap_mount_p1_body.Placement=App.Placement(App.Vector(0,0,0), App.Rotation(App.Vector(0,1,0),-90), App.Vector(0,0,0))
+doc.recompute()
+
+x_displacement = -InjectorCont_height - InjectorCont_flange_thickness
+z_displacement = endcap_mount_p1_base_width / 2
+y_displacement = -endcap_mount_p1_height_straight
+doc.endcap_mount_p1_body.Placement=App.Placement(App.Vector(x_displacement,y_displacement,z_displacement), App.Rotation(App.Vector(0,1,0),0), App.Vector(0,0,0)).multiply(doc.endcap_mount_p1_body.Placement)
+doc.recompute()
+
+
+
+# --------------------------------------------------
+# Create THREE of these endcap mounts and rotate them so they are all 90 degrees apart.
+# --------------------------------------------------
+rotation_increment = 360 / endcap_mount_p1_count
+for i in range(1,endcap_mount_p1_count):
+	j = i + 1
+	body_name = 'endcap_mount_p' + str(j)
+	clone_name = 'endcap_mount_p1_clone' + str(j)
+	doc.addObject('PartDesign::Body',body_name)
+	doc.addObject('PartDesign::FeatureBase',clone_name)
+	doc.getObject(clone_name).BaseFeature = doc.getObject('endcap_mount_p1_body')
+	doc.getObject(clone_name).Placement = doc.getObject('endcap_mount_p1_body').Placement
+	doc.getObject(clone_name).setEditorMode('Placement',0)
+	doc.getObject(body_name).Group = [doc.getObject(clone_name)]
+	doc.getObject(body_name).Tip = doc.getObject(clone_name)
+	doc.recompute()
+	
+	rotation = i * rotation_increment
+	print("Rotation: ", rotation)
+	doc.getObject(body_name).Placement=App.Placement(App.Vector(0,0,0), App.Rotation(App.Vector(1,0,0),rotation), App.Vector(0,0,0))
