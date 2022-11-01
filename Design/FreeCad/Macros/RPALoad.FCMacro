@@ -39,7 +39,7 @@ InjectorCont_flange_hole_radius = 1.5 # Radius of holes for bolts.
 
 InjectorCont_flange_oring_grove_depth = 1   # Depth of oring Grove
 InjectorCont_flange_oring_grove_width = 1   # Width of oring Grove
-
+InjectorCont_flange_oring_hole_gap    = 3   # Gap between hole and oring recess (For the o-ring)
 
 
 
@@ -430,13 +430,15 @@ doc.injectorcont_flange_holes_group.addObject(doc.InjectorCont_flange_with_holes
 # Create o-Ring groove
 # ----------------------------------------------
 # InjectorCont_flange_oring_grove_depth
+grove_y_offset = combustion_chamber_external_radius + InjectorCont_flange_width / 2  - InjectorCont_flange_hole_radius - InjectorCont_flange_oring_hole_gap
+grove_x_offset = -InjectorCont_height - InjectorCont_flange_thickness + InjectorCont_flange_oring_grove_depth
 grove_points = [[0,0], [0,InjectorCont_flange_oring_grove_width], [-InjectorCont_flange_oring_grove_depth, InjectorCont_flange_oring_grove_width], [-InjectorCont_flange_oring_grove_depth, 0], [0,0]]
 print(grove_points)
 
 grove_points_wire = []
 for i in range(0,len(grove_points)):
-	x = grove_points[i][0]
-	y = grove_points[i][1]
+	x = grove_x_offset + grove_points[i][0]
+	y = grove_y_offset + grove_points[i][1]
 	grove_points_wire.append(FreeCAD.Vector(float(x),float(y),float(0))) # append the coordinates
 
 
