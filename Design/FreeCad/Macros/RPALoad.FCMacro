@@ -37,8 +37,8 @@ InjectorCont_flange_thickness   = 5   # Thickness of flange
 InjectorCont_flange_hole_count  = 30  # Number of bolts to hold engine head plate on to Flange
 InjectorCont_flange_hole_radius = 1.5 # Radius of holes for bolts.
 
-InjectorCont_flange_oring_grove_depth = 1   # Depth of oring Grove
-InjectorCont_flange_oring_grove_width = 1   # Width of oring Grove
+InjectorCont_flange_oring_groove_depth = 1   # Depth of oring Groove
+InjectorCont_flange_oring_groove_width = 1   # Width of oring Groove
 InjectorCont_flange_oring_hole_gap    = 3   # Gap between hole and oring recess (For the o-ring)
 
 
@@ -429,31 +429,60 @@ doc.injectorcont_flange_holes_group.addObject(doc.InjectorCont_flange_with_holes
 # ----------------------------------------------
 # Create o-Ring groove
 # ----------------------------------------------
-# InjectorCont_flange_oring_grove_depth
-grove_y_offset = combustion_chamber_external_radius + InjectorCont_flange_width / 2  - InjectorCont_flange_hole_radius - InjectorCont_flange_oring_hole_gap
-grove_x_offset = -InjectorCont_height - InjectorCont_flange_thickness + InjectorCont_flange_oring_grove_depth
-grove_points = [[0,0], [0,InjectorCont_flange_oring_grove_width], [-InjectorCont_flange_oring_grove_depth, InjectorCont_flange_oring_grove_width], [-InjectorCont_flange_oring_grove_depth, 0], [0,0]]
-print(grove_points)
+# InjectorCont_flange_oring_groove_depth
+groove_y_offset = combustion_chamber_external_radius + InjectorCont_flange_width / 2  - InjectorCont_flange_hole_radius - InjectorCont_flange_oring_hole_gap
+groove_x_offset = -InjectorCont_height - InjectorCont_flange_thickness + InjectorCont_flange_oring_groove_depth
+groove_points = [[0,0], [0,InjectorCont_flange_oring_groove_width], [-InjectorCont_flange_oring_groove_depth, InjectorCont_flange_oring_groove_width], [-InjectorCont_flange_oring_groove_depth, 0], [0,0]]
+print(groove_points)
 
-grove_points_wire = []
-for i in range(0,len(grove_points)):
-	x = grove_x_offset + grove_points[i][0]
-	y = grove_y_offset + grove_points[i][1]
-	grove_points_wire.append(FreeCAD.Vector(float(x),float(y),float(0))) # append the coordinates
+groove_points_wire = []
+for i in range(0,len(groove_points)):
+	x = groove_x_offset + groove_points[i][0]
+	y = groove_y_offset + groove_points[i][1]
+	groove_points_wire.append(FreeCAD.Vector(float(x),float(y),float(0))) # append the coordinates
 
 
-grove_wire_object = Draft.makeWire(grove_points_wire,closed=False,face=False,support=None)   # create the wire open
+groove_oring_wire_object = Draft.makeWire(groove_points_wire,closed=False,face=False,support=None)   # create the wire open
 doc.recompute()
 
-sketch_grove = Draft.make_sketch([grove_wire_object], autoconstraints=True, delete=False, radiusPrecision=0)
+sketch_oring_groove = Draft.make_sketch([groove_oring_wire_object], autoconstraints=True, delete=False, radiusPrecision=0)
 doc.recompute()
+
+
+
+# ----------------------------------------------
+# Revolve the Sketch to create the trench (groove)
+# ----------------------------------------------
+
+doc.addObject('PartDesign::Body','ORing_Groove_Body')
+doc.getObject('ORing_Groove_Body').Group = [sketch_oring_groove]
+doc.recompute()
+
+sketch_oring_groove.Support = (doc.getObject('XY_Plane'), [''])
+sketch_oring_groove.MapMode = 'FlatFace'
+doc.recompute()
+
+
+### Begin command PartDesign_Revolution
+doc.getObject('ORing_Groove_Body').newObject('PartDesign::Revolution','oring_groove_revolution')
+doc.getObject('oring_groove_revolution').Profile = sketch_oring_groove
+doc.getObject('oring_groove_revolution').ReferenceAxis = (doc.getObject('X_Axis'), [''])
+doc.getObject('oring_groove_revolution').Angle = 360.0
+sketch_oring_groove.Visibility = False
+doc.getObject('oring_groove_revolution').Midplane = 0
+doc.getObject('oring_groove_revolution').Reversed = 0
+doc.recompute()
+
+
 
 
 # ----------------------------------------------
 # Subtract o-Ring from flange
 # ----------------------------------------------
-
-
+doc.addObject("Part::Cut","InjectorCont_flange_final")
+doc.InjectorCont_flange_final.Base = doc.getObject("InjectorCont_flange_with_holes")
+doc.InjectorCont_flange_final.Tool = doc.getObject('ORing_Groove_Body')
+doc.recompute()
 
 
 # ------------------------------------------------------------------------
@@ -1750,5 +1779,15 @@ for i in range(1,endcap_mount_p1_count):
 	doc.recompute()
 	
 	rotation = i * rotation_increment
-	print("Rotation: ", rotation)
+	print("Creating Body: ", body_name)
 	doc.getObject(body_name).Placement=App.Placement(App.Vector(0,0,0), App.Rotation(App.Vector(1,0,0),rotation), App.Vector(0,0,0))
+
+
+
+
+# -------------------------------------------
+# Combine endcap with endcap Mounts.
+# -------------------------------------------
+doc.addObject("Part::MultiFuse","Endcap_Final")
+doc.Endcap_Final.Shapes = [doc.getObject('endcap_mount_p1_body'), doc.getObject('endcap_mount_p2'), doc.getObject('endcap_mount_p3'), doc.getObject('endcap_mount_p4'), doc.Endcap_with_holes]
+doc.recompute()
