@@ -13,6 +13,7 @@ import csv
 import re
 import numpy as np
 import math
+import json
 from BasicShapes import Shapes
 from scipy import interpolate
 from PySide import QtGui
@@ -132,6 +133,24 @@ endcap_mount_p1_count           = 4     # Number of these mounts
 
 
 
+
+
+
+# Injector body
+injector_body_radius           = 123       # THIS IS SET LATER
+injector_body_height           = 123       # THIS IS SET LATER
+injector_body_fuel_hole_radius = 5         # The hole where the Pintle resides
+injector_body_lox_inner_radius_outlet = 10 # radius - from x axis
+injector_body_lox_outer_radius_outlet = 11 # radius - from x axis
+injector_body_oring_groove_width      = 2  # width (in x dirction) of o-ring groove
+injector_body_oring_groove_depth      = 2  # width (in radial dirction) of o-ring groove
+injector_body_oring_offset            = 5  # How far in mm along x axis away from combustion chamber
+
+
+
+
+
+
 # Variables
 wire = []
 channel_throat_radius = 99999       # This is radius to channel wall, closest to combustion chamber.  # Intentially set too high. Is deduced later.
@@ -142,13 +161,14 @@ overlap = 0.2                       # Because we create arcs as discrete straigh
                                     # We 
 
 
-doc = App.newDocument()
 
 
-# Make Groups
-RegenCoolingChannels = App.ActiveDocument.addObject("App::DocumentObjectGroup", "RegenCoolingChannels")
-MotorGroup = App.ActiveDocument.addObject("App::DocumentObjectGroup", "MotorGroup")
-Tvc_Engine_Mounts = App.ActiveDocument.addObject("App::DocumentObjectGroup", "Tvc_Engine_Mounts")
+
+
+
+
+
+
 
 
 
@@ -158,6 +178,15 @@ Tvc_Engine_Mounts = App.ActiveDocument.addObject("App::DocumentObjectGroup", "Tv
 file_dialog = QtGui.QFileDialog()
 rpa_file_path = file_dialog.getOpenFileName()[0]
 print("\nImporting: " + rpa_file_path + "\n")
+
+
+doc = App.newDocument()
+
+
+# Make Groups
+RegenCoolingChannels = App.ActiveDocument.addObject("App::DocumentObjectGroup", "RegenCoolingChannels")
+MotorGroup = App.ActiveDocument.addObject("App::DocumentObjectGroup", "MotorGroup")
+Tvc_Engine_Mounts = App.ActiveDocument.addObject("App::DocumentObjectGroup", "Tvc_Engine_Mounts")
 
 
 folder = os.path.dirname(rpa_file_path)
@@ -1790,4 +1819,40 @@ for i in range(1,endcap_mount_p1_count):
 # -------------------------------------------
 doc.addObject("Part::MultiFuse","Endcap_Final")
 doc.Endcap_Final.Shapes = [doc.getObject('endcap_mount_p1_body'), doc.getObject('endcap_mount_p2'), doc.getObject('endcap_mount_p3'), doc.getObject('endcap_mount_p4'), doc.Endcap_with_holes]
+doc.recompute()
+
+
+
+
+
+# Create the Injector.
+# ------------------------------------------------------------------------
+# Prompt user for Injector file
+# ------------------------------------------------------------------------
+file_dialog = QtGui.QFileDialog()
+injector_file_path = file_dialog.getOpenFileName()[0]
+print("\nImporting: " + injector_file_path + "\n")
+with open(injector_file_path, "r") as read_file:
+	injector_data = json.load(read_file)
+
+print(len(injector_data))
+
+
+
+wire = []
+line_count = 0
+for i in range(0, len(injector_data)):
+	x = float(injector_data[i][0])
+	y = float(injector_data[i][1])
+
+	wire.append(FreeCAD.Vector(float(x),float(y),float(0))) # append the coordinates
+	line_count += 1
+
+print(f'\nProcessed {line_count} lines.\n')
+wire_injector_body_object = Draft.makeWire(wire,closed=False, face=False,support=None)   # create the wire open
+
+
+doc.recompute()
+
+sketch_injector_body = Draft.make_sketch([wire_injector_body_object], autoconstraints=True, delete=False, radiusPrecision=0)
 doc.recompute()
