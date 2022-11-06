@@ -30,7 +30,7 @@ outfile = "out_profile.txt"
 # PART SPECIFICATIONS
 # --------------------------------------------------------
 # Injector combusion chamber housing
-InjectorCont_height             = 20  # Length of combustion chamber that extends forward to accomodate injector components
+InjectorCont_height             = 15  # Length of combustion chamber that extends forward to accomodate injector components
 InjectorCont_inner_radius       = 123 # Inside diameter of the injector assembly housing. - THIS IS SET LATER
 InjectorCont_outer_radius       = 123 # Outside diameter of the injector assembly housing. - THIS IS SET LATER
 InjectorCont_flange_width       = 10  # Additional length in radial direction
@@ -136,15 +136,38 @@ endcap_mount_p1_count           = 4     # Number of these mounts
 
 
 
-# Injector body
+# Injector body physical dimensions
 injector_body_radius           = 123       # THIS IS SET LATER
 injector_body_height           = 123       # THIS IS SET LATER
 injector_body_fuel_hole_radius = 5         # The hole where the Pintle resides
 injector_body_lox_inner_radius_outlet = 10 # radius - from x axis
 injector_body_lox_outer_radius_outlet = 11 # radius - from x axis
+injector_body_lox_narrow_exit_length  = 10 # The length of the "straight (cylindrical)" section, in x-axis 
 injector_body_oring_groove_width      = 2  # width (in x dirction) of o-ring groove
-injector_body_oring_groove_depth      = 2  # width (in radial dirction) of o-ring groove
+injector_body_oring_groove_depth      = 1.5  # width (in radial dirction) of o-ring groove
 injector_body_oring_offset            = 5  # How far in mm along x axis away from combustion chamber
+injector_body_fuel_chamfer_length     = 2  # How many mm back to do chamfer of fuel outlet
+injector_body_lox_hole_radius         = 4  # hole to carry LOX
+injector_body_lox_hole_height         = 30 # Height of cylinder required to make hole.
+
+
+# Injector pintle component physical dimensions
+injector_pintle_length                = 20   # Measured from top to the point at which the deflector starts
+injector_pintle_radius                = 2.5  # The radius of component that is inside the injector body
+injector_pintle_deflector_radius      = 9    # Radius at bottom of injector
+injector_pintle_deflector_height      = 6.5  # Bug having at 6.5   ... 6.5 + 2.6 = 9....so angle of deflector is 45 degrees
+
+
+
+
+# Propellant entry points
+# for now, we just want to attach a water hose, later this will change
+prop_hole_height1 = 20
+prop_hole_radius1 = 4
+prop_hole_height2 = 20
+prop_hole_radius2 = 6.6
+
+
 
 
 
@@ -158,7 +181,8 @@ channel_top_radius    = 0           # Radius of channel wall at the top of motor
 channel_bottom_radius = 0           # Radius of channel wall at the bottom of motor
 increment_distance = 1              # We approximate curved surfaces by breaking them down into small bits; what se specify here
 overlap = 0.2                       # Because we create arcs as discrete straight lines, they won't 100% touch a surface at some points
-                                    # We 
+close_interference_fit = 0.25       # For close interference fits 
+loose_interference_fit = 0.5        # For loose interference fits 
 
 
 
@@ -455,27 +479,33 @@ doc.injectorcont_flange_holes_group.addObject(doc.InjectorCont_flange_with_holes
 
 
 
+#
+#
+# WE HAVE REMOVED o-RING BECAUSE IT WILL BE FUTHER DOWN
+#
+#
+#
 # ----------------------------------------------
 # Create o-Ring groove
 # ----------------------------------------------
 # InjectorCont_flange_oring_groove_depth
-groove_y_offset = combustion_chamber_external_radius + InjectorCont_flange_width / 2  - InjectorCont_flange_hole_radius - InjectorCont_flange_oring_hole_gap
-groove_x_offset = -InjectorCont_height - InjectorCont_flange_thickness + InjectorCont_flange_oring_groove_depth
-groove_points = [[0,0], [0,InjectorCont_flange_oring_groove_width], [-InjectorCont_flange_oring_groove_depth, InjectorCont_flange_oring_groove_width], [-InjectorCont_flange_oring_groove_depth, 0], [0,0]]
-print(groove_points)
-
-groove_points_wire = []
-for i in range(0,len(groove_points)):
-	x = groove_x_offset + groove_points[i][0]
-	y = groove_y_offset + groove_points[i][1]
-	groove_points_wire.append(FreeCAD.Vector(float(x),float(y),float(0))) # append the coordinates
-
-
-groove_oring_wire_object = Draft.makeWire(groove_points_wire,closed=False,face=False,support=None)   # create the wire open
-doc.recompute()
-
-sketch_oring_groove = Draft.make_sketch([groove_oring_wire_object], autoconstraints=True, delete=False, radiusPrecision=0)
-doc.recompute()
+#   groove_y_offset = combustion_chamber_external_radius + InjectorCont_flange_width / 2  - InjectorCont_flange_hole_radius - InjectorCont_flange_oring_hole_gap
+#   groove_x_offset = -InjectorCont_height - InjectorCont_flange_thickness + InjectorCont_flange_oring_groove_depth
+#   groove_points = [[0,0], [0,InjectorCont_flange_oring_groove_width], [-InjectorCont_flange_oring_groove_depth, InjectorCont_flange_oring_groove_width], [-InjectorCont_flange_oring_groove_depth, 0], [0,0]]
+#   print(groove_points)
+#   
+#   groove_points_wire = []
+#   for i in range(0,len(groove_points)):
+#   	x = groove_x_offset + groove_points[i][0]
+#   	y = groove_y_offset + groove_points[i][1]
+#   	groove_points_wire.append(FreeCAD.Vector(float(x),float(y),float(0))) # append the coordinates
+#   
+#   
+#   groove_oring_wire_object = Draft.makeWire(groove_points_wire,closed=False,face=False,support=None)   # create the wire open
+#   doc.recompute()
+#   
+#   sketch_oring_groove = Draft.make_sketch([groove_oring_wire_object], autoconstraints=True, delete=False, radiusPrecision=0)
+#   doc.recompute()
 
 
 
@@ -483,24 +513,24 @@ doc.recompute()
 # Revolve the Sketch to create the trench (groove)
 # ----------------------------------------------
 
-doc.addObject('PartDesign::Body','ORing_Groove_Body')
-doc.getObject('ORing_Groove_Body').Group = [sketch_oring_groove]
-doc.recompute()
+#   doc.addObject('PartDesign::Body','ORing_Groove_Body')
+#   doc.getObject('ORing_Groove_Body').Group = [sketch_oring_groove]
+#   doc.recompute()
 
-sketch_oring_groove.Support = (doc.getObject('XY_Plane'), [''])
-sketch_oring_groove.MapMode = 'FlatFace'
-doc.recompute()
+#   sketch_oring_groove.Support = (doc.getObject('XY_Plane'), [''])
+#   sketch_oring_groove.MapMode = 'FlatFace'
+#   doc.recompute()
 
 
 ### Begin command PartDesign_Revolution
-doc.getObject('ORing_Groove_Body').newObject('PartDesign::Revolution','oring_groove_revolution')
-doc.getObject('oring_groove_revolution').Profile = sketch_oring_groove
-doc.getObject('oring_groove_revolution').ReferenceAxis = (doc.getObject('X_Axis'), [''])
-doc.getObject('oring_groove_revolution').Angle = 360.0
-sketch_oring_groove.Visibility = False
-doc.getObject('oring_groove_revolution').Midplane = 0
-doc.getObject('oring_groove_revolution').Reversed = 0
-doc.recompute()
+#   doc.getObject('ORing_Groove_Body').newObject('PartDesign::Revolution','oring_groove_revolution')
+#   doc.getObject('oring_groove_revolution').Profile = sketch_oring_groove
+#   doc.getObject('oring_groove_revolution').ReferenceAxis = (doc.getObject('X_Axis'), [''])
+#   doc.getObject('oring_groove_revolution').Angle = 360.0
+#   sketch_oring_groove.Visibility = False
+#   doc.getObject('oring_groove_revolution').Midplane = 0
+#   doc.getObject('oring_groove_revolution').Reversed = 0
+#   doc.recompute()
 
 
 
@@ -508,10 +538,10 @@ doc.recompute()
 # ----------------------------------------------
 # Subtract o-Ring from flange
 # ----------------------------------------------
-doc.addObject("Part::Cut","InjectorCont_flange_final")
-doc.InjectorCont_flange_final.Base = doc.getObject("InjectorCont_flange_with_holes")
-doc.InjectorCont_flange_final.Tool = doc.getObject('ORing_Groove_Body')
-doc.recompute()
+#   doc.addObject("Part::Cut","InjectorCont_flange_final")
+#   doc.InjectorCont_flange_final.Base = doc.getObject("InjectorCont_flange_with_holes")
+#   doc.InjectorCont_flange_final.Tool = doc.getObject('ORing_Groove_Body')
+#   doc.recompute()
 
 
 # ------------------------------------------------------------------------
@@ -1824,8 +1854,18 @@ doc.recompute()
 
 
 
-
+# ------------------------------------------------------------------------
 # Create the Injector.
+# ------------------------------------------------------------------------
+#
+#
+# We split this into TWO parts, the generic body and the cavity.
+# The generic body depends upon overall engine dimensions and the cavity is something that was designed "Free-hand"
+# in FreeCad. This may of course change.
+#
+# NOTE: The free-hand section and the generic body section must "match", i.e. there needs to be continuity and no sharp corners.
+#
+#
 # ------------------------------------------------------------------------
 # Prompt user for Injector file
 # ------------------------------------------------------------------------
@@ -1835,16 +1875,49 @@ print("\nImporting: " + injector_file_path + "\n")
 with open(injector_file_path, "r") as read_file:
 	injector_data = json.load(read_file)
 
-print(len(injector_data))
+
+# Sizing of the Injector
+injector_body_radius = combustion_chamber_internal_radius - close_interference_fit
+injector_body_height = InjectorCont_flange_thickness + InjectorCont_height
+
+
+# All the points of the Injector, except for the inside cavity
+injector_body_points =  [[-injector_body_lox_narrow_exit_length, injector_body_lox_outer_radius_outlet],
+					[0, injector_body_lox_outer_radius_outlet],
+					[0, injector_body_radius],
+					[-injector_body_oring_offset, injector_body_radius], 
+					[-injector_body_oring_offset, injector_body_radius - injector_body_oring_groove_depth],
+					[-injector_body_oring_offset - injector_body_oring_groove_width, injector_body_radius - injector_body_oring_groove_depth],
+					[-injector_body_oring_offset - injector_body_oring_groove_width, injector_body_radius],
+					[-injector_body_height, injector_body_radius],
+					[-injector_body_height, injector_body_fuel_hole_radius],
+					[-injector_body_fuel_chamfer_length, injector_body_fuel_hole_radius],
+					[0, injector_body_fuel_hole_radius + injector_body_fuel_chamfer_length],
+					[0, injector_body_lox_inner_radius_outlet],
+					[-injector_body_lox_narrow_exit_length, injector_body_lox_inner_radius_outlet]
+					]
 
 
 
+# Now, let's get the x,y points and create the Freecad objects...
 wire = []
 line_count = 0
+
+
+# FIRST WE GO OVER injector_body_points
+for i in range(0, len(injector_body_points)):
+	x = float(injector_body_points[i][0])
+	y = float(injector_body_points[i][1])
+	print("x, y = ", x, y)
+	wire.append(FreeCAD.Vector(float(x),float(y),float(0))) # append the coordinates
+	line_count += 1
+
+
+# THEN WE GO OVER POINTS IN FILE
 for i in range(0, len(injector_data)):
 	x = float(injector_data[i][0])
 	y = float(injector_data[i][1])
-
+	print("x, y: ", x, y)
 	wire.append(FreeCAD.Vector(float(x),float(y),float(0))) # append the coordinates
 	line_count += 1
 
@@ -1856,3 +1929,99 @@ doc.recompute()
 
 sketch_injector_body = Draft.make_sketch([wire_injector_body_object], autoconstraints=True, delete=False, radiusPrecision=0)
 doc.recompute()
+
+
+
+# ----------------------------------------------
+# Revolution of the Injector Body
+# -----------------------------------------------
+# Revolve coolant entry torus sketch to finish off coolant entry ring
+doc.addObject('PartDesign::Body','injector_body_body')
+doc.Coolant_outside_entry_torus_body.Group = [sketch_injector_body]
+
+sketch_injector_body.Support = (doc.getObject('XY_Plane042'), [''])
+sketch_injector_body.MapMode = 'FlatFace'
+doc.recompute()
+
+doc.getObject('injector_body_body').newObject('PartDesign::Revolution','injector_body_body_revolution')
+doc.getObject('injector_body_body_revolution').Profile = sketch_injector_body
+doc.getObject('injector_body_body_revolution').ReferenceAxis = (doc.getObject('X_Axis'), [''])
+doc.getObject('injector_body_body_revolution').Angle = 360.0
+sketch_injector_body.Visibility = False
+doc.getObject('injector_body_body_revolution').Midplane = 0
+doc.getObject('injector_body_body_revolution').Reversed = 0
+doc.recompute()
+
+wire_injector_body_object.Visibility = False
+doc.recompute()
+
+
+
+# --------------------------------------------------
+# Create the propellant holes.
+#
+# We create TWO here, one for LOX, one for FUEL.
+#
+# We do the cuts here.
+# --------------------------------------------------
+#
+# LOX
+lox_entry_cyl1 = doc.addObject("Part::Cylinder", "lox_entry_cyl1")
+lox_entry_cyl1.Radius = prop_hole_radius1
+lox_entry_cyl1.Height = prop_hole_height1
+
+
+lox_entry_cyl2 = doc.addObject("Part::Cylinder", "lox_entry_cyl2")
+lox_entry_cyl2.Radius = prop_hole_radius2
+lox_entry_cyl2.Height = prop_hole_height2
+
+lox_entry = doc.addObject("Part::Cut","lox_entry")
+lox_entry.Base = doc.lox_entry_cyl2
+lox_entry.Tool = doc.lox_entry_cyl1
+doc.recompute()
+
+
+
+# FUEL
+fuel_entry_cyl1 = doc.addObject("Part::Cylinder", "fuel_entry_cyl1")
+fuel_entry_cyl1.Radius = prop_hole_radius1
+fuel_entry_cyl1.Height = prop_hole_height1
+
+
+fuel_entry_cyl2 = doc.addObject("Part::Cylinder", "fuel_entry_cyl2")
+fuel_entry_cyl2.Radius = prop_hole_radius2
+fuel_entry_cyl2.Height = prop_hole_height2
+
+fuel_entry = doc.addObject("Part::Cut","fuel_entry")
+fuel_entry.Base = doc.fuel_entry_cyl2
+fuel_entry.Tool = doc.fuel_entry_cyl1
+doc.recompute()
+
+
+
+
+# --------------------------------------------------
+# Combine Injector Body and Endcap into one piece
+# --------------------------------------------------
+doc.addObject("Part::MultiFuse","Endcap_and_Injector_tmp1")
+doc.Endcap_and_Injector_tmp1.Shapes = [doc.getObject('injector_body_body'), doc.getObject('Endcap_Final')]
+doc.recompute()
+
+
+
+
+
+# --------------------------------------------------
+# Create hole in injector
+# --------------------------------------------------
+lox_hole = doc.addObject("Part::Cylinder", "injectorcont_lox_hole")
+lox_hole.Radius = injector_body_lox_hole_radius
+lox_hole.Height = injector_body_lox_hole_height
+lox_hole.Placement=App.Placement(App.Vector(0,0,0), App.Rotation(App.Vector(0,1,0),-90), App.Vector(0,0,0))
+lox_hole.Placement=App.Placement(App.Vector(-10,0,20), App.Rotation(App.Vector(0,1,0),-90), App.Vector(0,0,0))
+
+
+
+# -------------------------------------------------------
+# CREATE PINTLE PART OF INJECTOR
+# -------------------------------------------------------
