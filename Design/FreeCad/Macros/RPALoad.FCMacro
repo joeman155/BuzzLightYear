@@ -67,8 +67,9 @@ channel_height_throat = 4
 channel_height_bottom = 2
 
 # Coolant Entry
-coolant_entry_ring_height     = 10  # Height if ring, that connects all the channels
-coolant_entry_torus_thickness = 3   # Thickness of torus metal manifold at coolant exit (top of motor)
+coolant_entry_ring_height     = 10  # Height of ring, that connects all the channels
+coolant_entry_torus_thickness = 3   # Thickness of torus metal manifold at coolant exit (bottom of motor)
+coolant_inlet_hole_length     = 40  # How long to make Cylinder that attaches to existing coolant channels at bottom...that forms the "inlet hole"
 
 
 # Coolant Exit
@@ -784,7 +785,6 @@ doc.recompute()
 # Next we rotate and move this into place
 displacement = coolant_exit_ring_height + channel_top_reduction
 angle_rotation = -90
-# doc.Coolant_exit_ring.Placement=App.Placement(App.Vector(0,0,0), App.Rotation(App.Vector(0,1,0),-90), App.Vector(0,0,0))
 doc.Coolant_exit_ring.Placement=App.Placement(App.Vector(displacement,0,0), App.Rotation(App.Vector(0,1,0),angle_rotation), App.Vector(0,0,0))
 
 RegenCoolingChannels.addObjects([doc.getObject('Coolant_exit_ring')])
@@ -800,6 +800,7 @@ RegenCoolingChannels.addObjects([doc.getObject('Coolant_exit_ring')])
 # This is the INNER part of the coolant exit ring. (part 1 of 3)
 # ------------------------------------------------------------------------
 coolant_exit_ring_points = []
+coolant_entry_ring2 = []   # USed to create sketch to create revolved body which is used to create nice looking holes into cooling channels.
 for i in range(1, num_points_channel +1):
 	x = float(channel_points_raw[-i][0])
 	y = float(channel_points_raw[-i][1])
@@ -812,12 +813,17 @@ for i in range(1, num_points_channel +1):
 		xx = x_start - coolant_entry_ring_height
 		yy = f(xx)
 		coolant_exit_ring_points.append([xx, yy])
+		coolant_entry_ring2.append([xx, yy])
+		coolant_entry_ring2.append([xx, 0])
 		break
 	else:
 		xx = x
 		yy = y
 
+	if i == 1:
+		coolant_entry_ring2.append([xx, 0])
 	coolant_exit_ring_points.append([xx, yy])
+	coolant_entry_ring2.append([xx, yy])
 	# print("added xx, yy: ", xx, ", ", yy)
 
 
@@ -854,7 +860,6 @@ for i in range(0, num_points_channel):
 
 	prev_x = x
 	prev_y = y
-
 
 
 # Now that we have Inner and Outer points, we create a sketch.
@@ -1112,6 +1117,9 @@ for i in range(0, num_points_channel):
 	prev_y = y
 
 
+
+
+
 # Now we find "mid-point" between (min_x, min_y) and (max_x, max_y)
 f = interpolate.interp1d([min_x, max_x], [min_y, max_y])
 middle_x = (min_x + max_x) / 2
@@ -1124,7 +1132,7 @@ print("Angle of strip: ", gradient_angle)
 
 coolant_outside_entry_torus_points.reverse()
 
-# Now we create approximation of a circule ( 5 degrees apart ) to make the "torus" like cavity at coolant entry.
+# Now we create approximation of a circle ( 5 degrees apart ) to make the "torus" like cavity at coolant entry.
 step_size = 5   # number of degrees
 # for i in range(step_size - gradient_angle, 180 - (step_size - gradient_angle), step_size):
 positions = int(180 / step_size)
@@ -1134,6 +1142,12 @@ for i in range(0, positions+1):
 	xx = middle_x + (coolant_entry_torus_thickness + coolant_entry_ring_height / 2) * math.cos(angle)
 	yy = middle_y + (coolant_entry_torus_thickness + coolant_entry_ring_height / 2) * math.sin(angle)
 	coolant_outside_entry_torus_points.append([xx, yy])
+
+
+
+# BOTTOM TORUS CENTER X POSITION - needed when we create the pipework for inlet and outlet of cooling hacket
+x_centered_coolant_entry_ring_pos = middle_x    # x_start + coolant_entry_ring_height / 2
+y_centered_coolant_entry_ring_pos = middle_y
 
 
 # Now that we have all points that make up 1/2 semi-torus, we create a sketch.
@@ -1181,6 +1195,47 @@ doc.recompute()
 
 
 
+# Other Sketch for use later on.
+# Now that we have all points that make up 1/2 semi-torus, we create a sketch.
+wire = []
+for i in range(0, len(coolant_entry_ring2)):
+	x = coolant_entry_ring2[i][0]
+	y = coolant_entry_ring2[i][1]
+	wire.append(FreeCAD.Vector(x,y,float(0))) # append the coordinates
+
+
+wire_coolant_inlet_subtract_object = Draft.makeWire(wire,closed=True,face=False,support=None)   # create the wire open
+doc.recompute()
+
+sketch_coolant_inlet_subtract_object = Draft.make_sketch([wire_coolant_inlet_subtract_object], autoconstraints=True, delete=False, radiusPrecision=0)
+doc.recompute()
+
+
+
+#joejoe
+# ----------------------------------------------
+# Revolution of the Injector Body
+# -----------------------------------------------
+# Revolve coolant entry torus sketch to finish off coolant entry ring
+coolant_inlet_subtract_object_body = doc.addObject('PartDesign::Body','coolant_inlet_subtract_object_body')
+doc.coolant_inlet_subtract_object_body.Group = [sketch_coolant_inlet_subtract_object]
+
+sketch_coolant_inlet_subtract_object.Support = (doc.getObject('XY_Plane042'), [''])
+sketch_coolant_inlet_subtract_object.MapMode = 'FlatFace'
+doc.recompute()
+
+doc.getObject('coolant_inlet_subtract_object_body').newObject('PartDesign::Revolution','coolant_inlet_subtract_object_body_revolution')
+doc.getObject('coolant_inlet_subtract_object_body_revolution').Profile = sketch_coolant_inlet_subtract_object
+doc.getObject('coolant_inlet_subtract_object_body_revolution').ReferenceAxis = (doc.getObject('X_Axis'), [''])
+doc.getObject('coolant_inlet_subtract_object_body_revolution').Angle = 360.0
+sketch_coolant_inlet_subtract_object.Visibility = False
+doc.getObject('coolant_inlet_subtract_object_body_revolution').Midplane = 0
+doc.getObject('coolant_inlet_subtract_object_body_revolution').Reversed = 0
+doc.recompute()
+
+wire_coolant_inlet_subtract_object.Visibility = False
+doc.recompute()
+
 
 
 
@@ -1214,7 +1269,7 @@ points.append([x, y])
 
 
 
-# Form indie part of the component
+# Form inside part of the component
 segment_length = 2 * np.pi * tvs_eng_mount_p1_radius * tvs_eng_mount_p1_angle / 360
 segment_count = int(np.floor(segment_length / increment_distance))
 angle = segment_count / (segment_length / increment_distance) * tvs_eng_mount_p1_angle
@@ -1820,7 +1875,7 @@ doc.recompute()
 
 
 # --------------------------------------------------
-# Create THREE of these endcap mounts and rotate them so they are all 90 degrees apart.
+# Create THREE copies of these endcap mounts and rotate them so they are all 90 degrees apart.
 # --------------------------------------------------
 rotation_increment = 360 / endcap_mount_p1_count
 for i in range(1,endcap_mount_p1_count):
@@ -1849,6 +1904,41 @@ for i in range(1,endcap_mount_p1_count):
 doc.addObject("Part::MultiFuse","Endcap_Final")
 doc.Endcap_Final.Shapes = [doc.getObject('endcap_mount_p1_body'), doc.getObject('endcap_mount_p2'), doc.getObject('endcap_mount_p3'), doc.getObject('endcap_mount_p4'), doc.Endcap_with_holes]
 doc.recompute()
+
+
+
+# ------------------------------------------------------------------------
+# Create the inlet and outlets for the coolant jacket
+# ------------------------------------------------------------------------
+# ENTRY
+
+# Add inlet "hole" to the channels
+coolant_inlet_hole_tmp = doc.addObject("Part::Cylinder", "coolant_inlet_hole_tmp")
+coolant_inlet_hole_tmp.Radius = coolant_entry_ring_height / 2
+coolant_inlet_hole_tmp.Height = coolant_inlet_hole_length
+x_displacement = x_centered_coolant_entry_ring_pos
+y_displacement = y_centered_coolant_entry_ring_pos
+doc.coolant_inlet_hole_tmp.Placement=App.Placement(App.Vector(x_displacement,y_displacement,0), App.Rotation(App.Vector(0,0,1),0), App.Vector(0,0,0))
+
+
+# The inlet hole "cylinder" protrudes into the nozzle region, and so we need to subtract a body created previously from this to produce a clean
+# hole.
+
+
+# Subtract from inlet cylinder, so it doesn't protrude into the nozzle space
+
+coolant_inlet_hole = doc.addObject("Part::Cut","coolant_inlet_hole")
+coolant_inlet_hole.Base = doc.coolant_inlet_hole_tmp
+coolant_inlet_hole.Tool = doc.coolant_inlet_subtract_object_body
+doc.recompute()
+
+
+RegenCoolingChannels.addObjects([doc.getObject('coolant_inlet_hole')])
+
+
+
+
+
 
 
 
