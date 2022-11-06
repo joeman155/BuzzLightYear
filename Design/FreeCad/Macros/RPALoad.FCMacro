@@ -149,6 +149,9 @@ injector_body_oring_offset            = 5  # How far in mm along x axis away fro
 injector_body_fuel_chamfer_length     = 2  # How many mm back to do chamfer of fuel outlet
 injector_body_lox_hole_radius         = 4  # hole to carry LOX
 injector_body_lox_hole_height         = 30 # Height of cylinder required to make hole.
+injector_body_fuel_hole_radius         = 4  # hole to carry LOX
+injector_body_fuel_hole_height         = endcap_mount_p1_thickness # Height of cylinder required to make hole.
+
 
 
 # Injector pintle component physical dimensions
@@ -1694,7 +1697,6 @@ for i in range(1,segment_count):
 	x = -width + r * np.sin(angle + phi)
 	y = endcap_mount_p1_radial_offset + endcap_mount_p1_base_height + endcap_mount_p1_height_straight + r * np.cos(angle + phi)
 	points2.append([x, y])
-	print("x, y: ", x, y)
 
 
 # Add the last point on the circular segment
@@ -1702,7 +1704,6 @@ phi = arc_angle / 2
 x = -width + r * np.sin(phi)
 y = endcap_mount_p1_radial_offset + endcap_mount_p1_base_height + endcap_mount_p1_height_straight +  r * np.cos(phi)
 points2.append([x,y])
-print("x, y: ", x, y)
 
 
 
@@ -1710,7 +1711,6 @@ print("x, y: ", x, y)
 x = 0
 y = endcap_mount_p1_radial_offset + endcap_mount_p1_height_straight
 points2.append([x,y])
-print("x, y: ", x, y)
 
 
 
@@ -1718,7 +1718,6 @@ print("x, y: ", x, y)
 x = 0
 y = endcap_mount_p1_radial_offset
 points2.append([x,y])
-print("x, y: ", x, y)
 
 
 # Generate circlular hole.
@@ -1908,7 +1907,6 @@ line_count = 0
 for i in range(0, len(injector_body_points)):
 	x = float(injector_body_points[i][0])
 	y = float(injector_body_points[i][1])
-	print("x, y = ", x, y)
 	wire.append(FreeCAD.Vector(float(x),float(y),float(0))) # append the coordinates
 	line_count += 1
 
@@ -1917,7 +1915,6 @@ for i in range(0, len(injector_body_points)):
 for i in range(0, len(injector_data)):
 	x = float(injector_data[i][0])
 	y = float(injector_data[i][1])
-	print("x, y: ", x, y)
 	wire.append(FreeCAD.Vector(float(x),float(y),float(0))) # append the coordinates
 	line_count += 1
 
@@ -2001,6 +1998,22 @@ doc.recompute()
 
 
 # --------------------------------------------------
+# Rotate and move the fuel and lox lines into position 
+# --------------------------------------------------
+x_displacement = -InjectorCont_height - InjectorCont_flange_thickness - endcap_mount_p1_thickness
+doc.fuel_entry.Placement=App.Placement(App.Vector(0,0,0), App.Rotation(App.Vector(0,1,0),-90), App.Vector(0,0,0))
+doc.fuel_entry.Placement=App.Placement(App.Vector(x_displacement,0,0), App.Rotation(App.Vector(0,1,0),-90), App.Vector(0,0,0))
+
+
+
+x_displacement = -InjectorCont_height - InjectorCont_flange_thickness - endcap_mount_p1_thickness
+z_displacement = 20
+doc.lox_entry.Placement=App.Placement(App.Vector(0,0,0), App.Rotation(App.Vector(0,1,0),-90), App.Vector(0,0,0))
+doc.lox_entry.Placement=App.Placement(App.Vector(x_displacement,0,z_displacement), App.Rotation(App.Vector(0,1,0),-90), App.Vector(0,0,0))
+
+
+
+# --------------------------------------------------
 # Combine Injector Body and Endcap into one piece
 # --------------------------------------------------
 doc.addObject("Part::MultiFuse","Endcap_and_Injector_tmp1")
@@ -2012,7 +2025,7 @@ doc.recompute()
 
 
 # --------------------------------------------------
-# Create hole in injector
+# Create hole in injector for LOX
 # --------------------------------------------------
 lox_hole = doc.addObject("Part::Cylinder", "injectorcont_lox_hole")
 lox_hole.Radius = injector_body_lox_hole_radius
@@ -2022,6 +2035,107 @@ lox_hole.Placement=App.Placement(App.Vector(-10,0,20), App.Rotation(App.Vector(0
 
 
 
+
+
+
+
+# --------------------------------------------------
+# Create hole in injector for LOX
+# --------------------------------------------------
+fuel_hole = doc.addObject("Part::Cylinder", "injectorcont_fuel_hole")
+fuel_hole.Radius = injector_body_fuel_hole_radius
+fuel_hole.Height = injector_body_fuel_hole_height
+x_displacement = -InjectorCont_height - InjectorCont_flange_thickness
+fuel_hole.Placement=App.Placement(App.Vector(0,0,0), App.Rotation(App.Vector(0,1,0),-90), App.Vector(0,0,0))
+fuel_hole.Placement=App.Placement(App.Vector(x_displacement,0,0), App.Rotation(App.Vector(0,1,0),-90), App.Vector(0,0,0))
+
+
+
+# --------------------------------------------------
+# Combine the LOX and FUEL holes, before we subtract them...
+# --------------------------------------------------
+Propellant_Holes_Fusion = doc.addObject("Part::MultiFuse","Propellant_Holes_Fusion")
+doc.Propellant_Holes_Fusion.Shapes = [fuel_hole, lox_hole]
+doc.recompute()
+
+
+
+# --------------------------------------------------
+# Subtract holes from endcap injector assembly.
+# --------------------------------------------------
+Endcap_and_Injector_tmp2 = doc.addObject("Part::Cut","Endcap_and_Injector_tmp2")
+Endcap_and_Injector_tmp2.Base = doc.Endcap_and_Injector_tmp1
+Endcap_and_Injector_tmp2.Tool = doc.Propellant_Holes_Fusion
+doc.recompute()
+
+
+
+
+
+# -----------------------------------------------
+# Combine remaining parts to make the endcap + injector assembly
+# -----------------------------------------------
+doc.addObject("Part::MultiFuse","Endcap_Injector_Assembly")
+doc.Endcap_Injector_Assembly.Shapes = [Endcap_and_Injector_tmp2, fuel_entry, lox_entry]
+doc.recompute()
+
+
+
+
 # -------------------------------------------------------
 # CREATE PINTLE PART OF INJECTOR
 # -------------------------------------------------------
+injector_pintle_body_points =  [[-injector_pintle_length, 0],
+								[injector_pintle_deflector_height, 0],
+								[injector_pintle_deflector_height, injector_pintle_deflector_radius],
+								[0,injector_pintle_radius],
+								[-injector_pintle_length, injector_pintle_radius],
+								[-injector_pintle_length, 0]]
+
+
+# Now, let's get the x,y points and create the Freecad objects...
+wire = []
+line_count = 0
+
+
+# FIRST WE GO OVER injector_body_points
+for i in range(0, len(injector_pintle_body_points)):
+	x = float(injector_pintle_body_points[i][0])
+	y = float(injector_pintle_body_points[i][1])
+	wire.append(FreeCAD.Vector(float(x),float(y),float(0))) # append the coordinates
+	line_count += 1
+
+
+print(f'\nProcessed {line_count} lines.\n')
+wire_injector_pintle_body_object = Draft.makeWire(wire,closed=False, face=False,support=None)   # create the wire open
+doc.recompute()
+
+sketch_injector_pintle_body = Draft.make_sketch([wire_injector_pintle_body_object], autoconstraints=True, delete=False, radiusPrecision=0)
+doc.recompute()
+
+
+# -----------------------------------------------
+# Revolution of the Injector Body
+# -----------------------------------------------
+# Revolve coolant entry torus sketch to finish off coolant entry ring
+doc.addObject('PartDesign::Body','injector_pintle_body_body')
+doc.injector_pintle_body_body.Group = [sketch_injector_pintle_body]
+
+sketch_injector_pintle_body.Support = (doc.getObject('XY_Plane042'), [''])
+sketch_injector_pintle_body.MapMode = 'FlatFace'
+doc.recompute()
+
+doc.getObject('injector_pintle_body_body').newObject('PartDesign::Revolution','injector_pintle_body_body_revolution')
+doc.getObject('injector_pintle_body_body_revolution').Profile = sketch_injector_pintle_body
+doc.getObject('injector_pintle_body_body_revolution').ReferenceAxis = (doc.getObject('X_Axis'), [''])
+doc.getObject('injector_pintle_body_body_revolution').Angle = 360.0
+sketch_injector_pintle_body.Visibility = False
+doc.getObject('injector_pintle_body_body_revolution').Midplane = 0
+doc.getObject('injector_pintle_body_body_revolution').Reversed = 0
+doc.recompute()
+
+wire_injector_pintle_body_object.Visibility = False
+doc.recompute()
+
+
+
