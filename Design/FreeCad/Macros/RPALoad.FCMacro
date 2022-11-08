@@ -1980,6 +1980,26 @@ MotorGroup.addObjects([doc.getObject('coolant_inlet_pipework')])
 
 
 
+# ------------------------------------------------------------------------
+# We make body (cylinder) that is used to subtract components entering the combusion chamber
+# We make Two of them, identical pieces, so we can do TWO subtractions a little further down.
+# ------------------------------------------------------------------------
+
+# joe
+coolant_outlet_subtract_object_body = doc.addObject("Part::Cylinder", "coolant_outlet_subtract_object_body")
+coolant_outlet_subtract_object_body.Radius = top_radius
+coolant_outlet_subtract_object_body.Height = coolant_exit_ring_height
+x_displacement = x_centered_coolant_exit_ring_pos
+y_displacement = y_centered_coolant_exit_ring_pos
+doc.coolant_outlet_subtract_object_body.Placement=App.Placement(App.Vector(x_displacement,y_displacement,0), App.Rotation(App.Vector(0,0,1),0), App.Vector(0,0,0))
+
+coolant_outlet_subtract_object_body2 = doc.addObject("Part::Cylinder", "coolant_outlet_subtract_object_body2")
+coolant_outlet_subtract_object_body2.Radius = top_radius
+coolant_outlet_subtract_object_body2.Height = coolant_exit_ring_height
+x_displacement = x_centered_coolant_exit_ring_pos
+y_displacement = y_centered_coolant_exit_ring_pos
+doc.coolant_outlet_subtract_object_body2.Placement=App.Placement(App.Vector(x_displacement,y_displacement,0), App.Rotation(App.Vector(0,0,1),0), App.Vector(0,0,0))
+
 
 
 
@@ -2005,13 +2025,13 @@ doc.coolant_outlet_hole_tmp.Placement=App.Placement(App.Vector(x_displacement,y_
 
 # Subtract from inlet cylinder, so it doesn't protrude into the nozzle space
 # joe
-# coolant_outlet_hole = doc.addObject("Part::Cut","coolant_outlet_hole")
-# coolant_outlet_hole.Base = doc.coolant_outlet_hole_tmp
-# coolant_outlet_hole.Tool = doc.coolant_outlet_subtract_object_body
-# doc.recompute()
+coolant_outlet_hole = doc.addObject("Part::Cut","coolant_outlet_hole")
+coolant_outlet_hole.Base = doc.coolant_outlet_hole_tmp
+coolant_outlet_hole.Tool = doc.coolant_outlet_subtract_object_body
+doc.recompute()
 
 
-# RegenCoolingChannels.addObjects([doc.getObject('coolant_outlet_hole')])
+RegenCoolingChannels.addObjects([doc.getObject('coolant_outlet_hole')])
 
 
 
@@ -2031,12 +2051,12 @@ doc.recompute()
 
 # Subtract from inlet cylinder, so it doesn't protrude into the nozzle space
 # joe
-# coolant_outlet_pipework = doc.addObject("Part::Cut","coolant_outlet_pipework")
-# coolant_outlet_pipework.Base = doc.coolant_outlet_pipework_tmp
-# coolant_outlet_pipework.Tool = doc.coolant_outlet_subtract_object_body2
-# doc.recompute()
+coolant_outlet_pipework = doc.addObject("Part::Cut","coolant_outlet_pipework")
+coolant_outlet_pipework.Base = doc.coolant_outlet_pipework_tmp
+coolant_outlet_pipework.Tool = doc.coolant_outlet_subtract_object_body2
+doc.recompute()
 
-# MotorGroup.addObjects([doc.getObject('coolant_outlet_pipework')])
+MotorGroup.addObjects([doc.getObject('coolant_outlet_pipework')])
 
 
 
