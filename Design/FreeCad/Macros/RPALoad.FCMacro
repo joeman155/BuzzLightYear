@@ -35,7 +35,7 @@ InjectorCont_inner_radius       = 123 # Inside diameter of the injector assembly
 InjectorCont_outer_radius       = 123 # Outside diameter of the injector assembly housing. - THIS IS SET LATER
 InjectorCont_flange_width       = 10  # Additional length in radial direction
 InjectorCont_flange_thickness   = 5   # Thickness of flange
-InjectorCont_flange_hole_count  = 30  # Number of bolts to hold engine head plate on to Flange
+InjectorCont_flange_hole_count  = 16  # Number of bolts to hold engine head plate on to Flange
 InjectorCont_flange_hole_radius = 1.5 # Radius of holes for bolts.
 
 InjectorCont_flange_oring_groove_depth = 1   # Depth of oring Groove
@@ -70,12 +70,15 @@ channel_height_bottom = 2
 coolant_entry_ring_height     = 10  # Height of ring, that connects all the channels
 coolant_entry_torus_thickness = 3   # Thickness of torus metal manifold at coolant exit (bottom of motor)
 coolant_inlet_hole_length     = 40  # How long to make Cylinder that attaches to existing coolant channels at bottom...that forms the "inlet hole"
+coolant_inlet_pipework_length = 40  # How long to make Cylinder that ends up being the pipework at bottom
+
 
 
 # Coolant Exit
 coolant_exit_ring_height    = 10    # Height if ring, that connects all the channels
 coolant_exit_torus_thickness = 3    # Thickness of torus metal manifold at coolant exit (top of motor)
-
+coolant_outlet_hole_length     = 40  # How long to make Cylinder that attaches to existing coolant channels at bottom...that forms the "inlet hole"
+coolant_outlet_pipework_length = 40  # How long to make Cylinder that ends up being the pipework at bottom
 
 #
 # Basic physical parameters of the component
@@ -908,10 +911,8 @@ doc.recompute()
 
 
 
-
-
 # ------------------------------------------------------------------------
-# Half-Torus - Coolant cooling exit
+# Half-Torus - Coolant cooling exit - inside torus
 # ------------------------------------------------------------------------
 doc.addObject("Part::Torus","Coolant_exit_Torus")
 doc.ActiveObject.Label = "Coolant_exit_Torus"
@@ -922,15 +923,20 @@ doc.getObject('Coolant_exit_Torus').Radius2 = coolant_exit_ring_height / 2
 doc.getObject('Coolant_exit_Torus').Angle1 = '-90.00 deg'
 doc.getObject('Coolant_exit_Torus').Angle2 = '90.00 deg'
 
-displacement = channel_top_reduction + coolant_exit_ring_height / 2
+x_displacement = channel_top_reduction + coolant_exit_ring_height / 2
 angle_rotation = -90
-doc.getObject('Coolant_exit_Torus').Placement=App.Placement(App.Vector(displacement,0,0), App.Rotation(App.Vector(0,1,0),angle_rotation), App.Vector(0,0,0))
+doc.getObject('Coolant_exit_Torus').Placement=App.Placement(App.Vector(x_displacement,0,0), App.Rotation(App.Vector(0,1,0),angle_rotation), App.Vector(0,0,0))
 doc.recompute()
 
 
 # Add to Regen Cooling components
 RegenCoolingChannels.addObjects([doc.getObject('Coolant_exit_Torus')])
 doc.recompute()
+
+# Location to place pipe work later in the script.
+x_centered_coolant_exit_ring_pos = channel_top_reduction + coolant_exit_ring_height / 2
+y_centered_coolant_exit_ring_pos = top_radius + channel_height_top
+
 
 
 
@@ -1001,6 +1007,9 @@ for i in range(1, positions - 1):
 	coolant_entry_torus_points.append([xx, yy])
 
 
+
+
+
 # Now that we have Inner and Outer points, we create a sketch.
 coolant_entry_torus = []
 for i in range(0, len(coolant_entry_torus_points)):
@@ -1047,9 +1056,6 @@ doc.recompute()
 
 
 
-
-
-
 ######################################################################
 # Create Coolant Exit OUTSIDE Torus (Top of the motor)
 # Half-Torus - Coolant cooling exit
@@ -1062,9 +1068,9 @@ doc.getObject('Coolant_outside_exit_Torus').Radius2 = coolant_exit_torus_thickne
 doc.getObject('Coolant_outside_exit_Torus').Angle1 = '-90.00 deg'
 doc.getObject('Coolant_outside_exit_Torus').Angle2 = '90.00 deg'
 
-displacement = channel_top_reduction + coolant_exit_ring_height / 2
+x_displacement = channel_top_reduction + coolant_exit_ring_height / 2
 angle_rotation = -90
-doc.getObject('Coolant_outside_exit_Torus').Placement=App.Placement(App.Vector(displacement,0,0), App.Rotation(App.Vector(0,1,0),angle_rotation), App.Vector(0,0,0))
+doc.getObject('Coolant_outside_exit_Torus').Placement=App.Placement(App.Vector(x_displacement,0,0), App.Rotation(App.Vector(0,1,0),angle_rotation), App.Vector(0,0,0))
 doc.recompute()
 
 
@@ -1144,10 +1150,11 @@ for i in range(0, positions+1):
 	coolant_outside_entry_torus_points.append([xx, yy])
 
 
-
 # BOTTOM TORUS CENTER X POSITION - needed when we create the pipework for inlet and outlet of cooling hacket
 x_centered_coolant_entry_ring_pos = middle_x    # x_start + coolant_entry_ring_height / 2
 y_centered_coolant_entry_ring_pos = middle_y
+
+
 
 
 # Now that we have all points that make up 1/2 semi-torus, we create a sketch.
@@ -1212,7 +1219,7 @@ doc.recompute()
 
 
 
-#joejoe
+
 # ----------------------------------------------
 # Revolution of the Injector Body
 # -----------------------------------------------
@@ -1237,6 +1244,17 @@ wire_coolant_inlet_subtract_object.Visibility = False
 doc.recompute()
 
 
+# Make a copy of this body, coolant_inlet_subtract_object_body as we will need to do another subtraction
+body_name = 'coolant_inlet_subtract_object_body2'
+clone_name = 'coolant_inlet_subtract_object_clone2'
+doc.addObject('PartDesign::Body',body_name)
+doc.addObject('PartDesign::FeatureBase',clone_name)
+doc.getObject(clone_name).BaseFeature = doc.getObject('coolant_inlet_subtract_object_body')
+doc.getObject(clone_name).Placement = doc.getObject('coolant_inlet_subtract_object_body').Placement
+doc.getObject(clone_name).setEditorMode('Placement',0)
+doc.getObject(body_name).Group = [doc.getObject(clone_name)]
+doc.getObject(body_name).Tip = doc.getObject(clone_name)
+doc.recompute()
 
 
 
@@ -1908,7 +1926,7 @@ doc.recompute()
 
 
 # ------------------------------------------------------------------------
-# Create the inlet and outlets for the coolant jacket
+# Create the inlet for the coolant jacket
 # ------------------------------------------------------------------------
 # ENTRY
 
@@ -1926,7 +1944,7 @@ doc.coolant_inlet_hole_tmp.Placement=App.Placement(App.Vector(x_displacement,y_d
 
 
 # Subtract from inlet cylinder, so it doesn't protrude into the nozzle space
-
+# joe
 coolant_inlet_hole = doc.addObject("Part::Cut","coolant_inlet_hole")
 coolant_inlet_hole.Base = doc.coolant_inlet_hole_tmp
 coolant_inlet_hole.Tool = doc.coolant_inlet_subtract_object_body
@@ -1934,6 +1952,101 @@ doc.recompute()
 
 
 RegenCoolingChannels.addObjects([doc.getObject('coolant_inlet_hole')])
+
+
+
+# ------------------------------------------------------------------------
+# Create the coolant inlet "pipe work"
+# ------------------------------------------------------------------------
+# Add inlet "hole" to the channels
+coolant_inlet_pipework_tmp = doc.addObject("Part::Cylinder", "coolant_inlet_pipework_tmp")
+coolant_inlet_pipework_tmp.Radius = coolant_entry_ring_height / 2 + coolant_entry_torus_thickness / 2
+coolant_inlet_pipework_tmp.Height = coolant_inlet_pipework_length
+x_displacement = x_centered_coolant_entry_ring_pos
+y_displacement = y_centered_coolant_entry_ring_pos
+doc.coolant_inlet_pipework_tmp.Placement=App.Placement(App.Vector(x_displacement,y_displacement,0), App.Rotation(App.Vector(0,0,1),0), App.Vector(0,0,0))
+
+
+# Subtract from inlet cylinder, so it doesn't protrude into the nozzle space
+# joe
+coolant_inlet_pipework = doc.addObject("Part::Cut","coolant_inlet_pipework")
+coolant_inlet_pipework.Base = doc.coolant_inlet_pipework_tmp
+coolant_inlet_pipework.Tool = doc.coolant_inlet_subtract_object_body2
+doc.recompute()
+
+MotorGroup.addObjects([doc.getObject('coolant_inlet_pipework')])
+
+
+
+
+
+
+
+
+
+
+# ------------------------------------------------------------------------
+# Create the outlet for the coolant jacket
+# ------------------------------------------------------------------------
+# ENTRY
+
+# Add outlet "hole" to the channels
+coolant_outlet_hole_tmp = doc.addObject("Part::Cylinder", "coolant_outlet_hole_tmp")
+coolant_outlet_hole_tmp.Radius = coolant_exit_ring_height / 2
+coolant_outlet_hole_tmp.Height = coolant_outlet_hole_length
+x_displacement = x_centered_coolant_exit_ring_pos
+y_displacement = y_centered_coolant_exit_ring_pos
+doc.coolant_outlet_hole_tmp.Placement=App.Placement(App.Vector(x_displacement,y_displacement,0), App.Rotation(App.Vector(0,0,1),0), App.Vector(0,0,0))
+
+
+# The inlet hole "cylinder" protrudes into the nozzle region, and so we need to subtract a body created previously from this to produce a clean
+# hole.
+
+
+# Subtract from inlet cylinder, so it doesn't protrude into the nozzle space
+# joe
+# coolant_outlet_hole = doc.addObject("Part::Cut","coolant_outlet_hole")
+# coolant_outlet_hole.Base = doc.coolant_outlet_hole_tmp
+# coolant_outlet_hole.Tool = doc.coolant_outlet_subtract_object_body
+# doc.recompute()
+
+
+# RegenCoolingChannels.addObjects([doc.getObject('coolant_outlet_hole')])
+
+
+
+# ------------------------------------------------------------------------
+# Create the coolant outlet "pipe work"
+# ------------------------------------------------------------------------
+# Add inlet "hole" to the channels
+coolant_outlet_pipework_tmp = doc.addObject("Part::Cylinder", "coolant_outlet_pipework_tmp")
+coolant_outlet_pipework_tmp.Radius = coolant_exit_ring_height / 2 + coolant_exit_torus_thickness / 2
+coolant_outlet_pipework_tmp.Height = coolant_outlet_pipework_length
+x_displacement = x_centered_coolant_exit_ring_pos
+y_displacement = y_centered_coolant_exit_ring_pos
+doc.coolant_outlet_pipework_tmp.Placement=App.Placement(App.Vector(x_displacement,y_displacement,0), App.Rotation(App.Vector(0,0,1),0), App.Vector(0,0,0))
+doc.recompute()
+
+
+
+# Subtract from inlet cylinder, so it doesn't protrude into the nozzle space
+# joe
+# coolant_outlet_pipework = doc.addObject("Part::Cut","coolant_outlet_pipework")
+# coolant_outlet_pipework.Base = doc.coolant_outlet_pipework_tmp
+# coolant_outlet_pipework.Tool = doc.coolant_outlet_subtract_object_body2
+# doc.recompute()
+
+# MotorGroup.addObjects([doc.getObject('coolant_outlet_pipework')])
+
+
+
+
+
+
+
+
+
+
 
 
 
