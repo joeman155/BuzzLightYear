@@ -1989,17 +1989,14 @@ MotorGroup.addObjects([doc.getObject('coolant_inlet_pipework')])
 coolant_outlet_subtract_object_body = doc.addObject("Part::Cylinder", "coolant_outlet_subtract_object_body")
 coolant_outlet_subtract_object_body.Radius = top_radius
 coolant_outlet_subtract_object_body.Height = coolant_exit_ring_height
-x_displacement = x_centered_coolant_exit_ring_pos
-y_displacement = y_centered_coolant_exit_ring_pos
-doc.coolant_outlet_subtract_object_body.Placement=App.Placement(App.Vector(x_displacement,y_displacement,0), App.Rotation(App.Vector(0,0,1),0), App.Vector(0,0,0))
+x_displacement = x_centered_coolant_exit_ring_pos + coolant_exit_ring_height / 2
+doc.coolant_outlet_subtract_object_body.Placement=App.Placement(App.Vector(x_displacement,0,0), App.Rotation(App.Vector(0,1,0),-90), App.Vector(0,0,0))
 
 coolant_outlet_subtract_object_body2 = doc.addObject("Part::Cylinder", "coolant_outlet_subtract_object_body2")
 coolant_outlet_subtract_object_body2.Radius = top_radius
-coolant_outlet_subtract_object_body2.Height = coolant_exit_ring_height
-x_displacement = x_centered_coolant_exit_ring_pos
-y_displacement = y_centered_coolant_exit_ring_pos
-doc.coolant_outlet_subtract_object_body2.Placement=App.Placement(App.Vector(x_displacement,y_displacement,0), App.Rotation(App.Vector(0,0,1),0), App.Vector(0,0,0))
-
+coolant_outlet_subtract_object_body2.Height = coolant_exit_ring_height + coolant_entry_torus_thickness
+x_displacement = x_centered_coolant_exit_ring_pos + coolant_exit_ring_height / 2 + coolant_entry_torus_thickness / 2
+doc.coolant_outlet_subtract_object_body2.Placement=App.Placement(App.Vector(x_displacement,0,0), App.Rotation(App.Vector(0,1,0),-90), App.Vector(0,0,0))
 
 
 
